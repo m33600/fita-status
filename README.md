@@ -25,9 +25,24 @@ parte do endereço ao GitHub, então ela só existe no link que você compartilh
 Mandou o link para alguém que não deveria ter? Troque o `DWEET_COISA` no
 `secrets.h` do firmware, regrave a placa e envie o link novo.
 
+## Confirmação da fita
+
+A fita (firmware v0.3 ou mais novo) grava o que está mostrando em
+`<nome-da-fita>-fita`: na hora em que a cor muda e depois a cada 30 s. A página
+lê essa coisa e mostra:
+
+- **✓ confirmado pela fita há X s** — a fita está ligada e mostrando essa cor;
+- **pedido: Amarelo, aguardando a fita…** — o clique chegou ao dweet.cc, mas a
+  fita ainda não aplicou (normal por até ~5 s);
+- **fita sem sinal há X min** — nenhuma confirmação há mais de 75 s: a fita está
+  desligada ou sem internet, e a cor mostrada é a última que ela confirmou.
+
+O pedido fica gravado: se a fita estiver fora do ar, ela aplica quando voltar.
+
 ## Limites
 
-- A página mostra o que está gravado no dweet.cc, não o que a fita está
-  exibindo: se a fita estiver desligada ou sem WiFi, a página não percebe.
-- O dweet.cc apaga o valor depois de 24 h sem gravação; a página então mostra
-  "sem status" até alguém tocar numa cor.
+- O dweet.cc apaga cada coisa depois de 24 h sem gravação. A confirmação da fita
+  se renova sozinha; o status pedido, não — se ninguém tocar numa cor por 24 h e
+  a fita reiniciar, ela fica sem status até o próximo toque.
+- O `?api=` no endereço (para testar por um proxy local) só funciona com a
+  página aberta em `127.0.0.1`; publicada, ela fala sempre com o dweet.cc.

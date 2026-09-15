@@ -54,11 +54,15 @@
     width: 64px; height: 64px; flex: none;
     border-radius: 50%;
     background: var(--borda);
-    transition: background .25s, box-shadow .25s;
+    transition: background .25s, box-shadow .25s, opacity .25s;
   }
   .lampada.acesa { box-shadow: 0 0 28px 4px var(--brilho, transparent); }
+  .lampada.velha { opacity: .35; }
+  .textos { min-width: 0; }
   .rotulo { font-size: 0.85rem; color: var(--suave); }
   .atual { font-size: 1.6rem; font-weight: 650; line-height: 1.2; }
+  .detalhe { font-size: .9rem; color: var(--suave); margin-top: 4px; }
+  .detalhe.ok { color: var(--verde); }
 
   .botoes {
     display: grid;
@@ -101,13 +105,14 @@
     font-size: .95rem;
   }
   .aviso.erro { color: var(--vermelho); }
+  .aviso.ok { color: var(--verde); }
   .rodape {
     margin-top: 22px;
     padding-top: 14px;
     border-top: 1px solid var(--borda);
     color: var(--suave);
     font-size: .85rem;
-    display: flex; flex-wrap: wrap; gap: 4px 14px;
+    display: flex; flex-wrap: wrap; gap: 4px 16px;
   }
   .ponto { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--suave); margin-right: 6px; vertical-align: 1px; }
   .ponto.ok { background: var(--verde); }
@@ -134,9 +139,10 @@
   <section id="app" hidden>
     <div class="painel" aria-live="polite">
       <div class="lampada" id="lampada"></div>
-      <div>
+      <div class="textos">
         <div class="rotulo">A fita está</div>
         <div class="atual" id="atual">lendo…</div>
+        <div class="detalhe" id="detalhe"></div>
       </div>
     </div>
 
@@ -150,6 +156,7 @@
     <p class="aviso" id="aviso" role="status"></p>
 
     <div class="rodape">
+      <span><span class="ponto" id="ponto-fita"></span><span id="fita-info">fita: aguardando…</span></span>
       <span><span class="ponto" id="ponto"></span><span id="conexao">conectando ao dweet.cc…</span></span>
       <span id="nome"></span>
     </div>
@@ -167,8 +174,13 @@
 
 <script>
 (() => {
-  const API = 'https://dweet.cc';
+  // ?api= só vale com a página aberta no próprio PC (teste por proxy local).
+  // Publicada, ela fala sempre com o dweet.cc — um link malicioso não desvia o nome da fita.
+  const LOCAL = ['127.0.0.1', 'localhost'].includes(location.hostname);
+  const API = (LOCAL && new URLSearchParams(location.search).get('api')) || 'https://dweet.cc';
   const LEITURA_MS = 3000;
+  const FITA_ONLINE_S = 75;         // a fita confirma a cada 30 s
+  const SEM_CONFIRMAR_MS = 20000;   // depois disso o pedido é dado como não atendido
   const CORES = {
     0: { nome: 'Apagada',  css: 'var(--apagada)' },
     1: { nome: 'Verde',    css: 'var(--verde)' },
@@ -184,65 +196,121 @@
   const coisaDoLink = () => decodeURIComponent(location.hash.slice(1)).trim();
   const coisaValida = (c) => /^[A-Za-z0-9_.\-]{6,120}$/.test(c);
 
+  const abertaEm = Date.now();
   let coisa = '';
+  let timer = null;
   let ultimaLeituraOk = 0;
   let enviando = false;
-  let timer = null;
+  let pedido;              // status gravado na coisa (null = sem status, undefined = ainda não leu)
+  let fita = null;         // última confirmação da fita: {exibindo, em, up, rssi, versao}
+  let fitaVistaLocal = 0;  // quando a página viu o "up" mudar (só usado se a fita estiver sem NTP)
+  let clique = null;       // {v, em, confirmado, alertado}
 
-  function mostrarStatus(s) {
-    const info = CORES[s];
-    const lampada = $('lampada');
-    if (info) {
-      $('atual').textContent = info.nome;
-      lampada.style.background = info.css;
-      lampada.style.setProperty('--brilho', s === 0 ? 'transparent' : info.css);
-      lampada.classList.toggle('acesa', s !== 0);
-    } else if (s === null) {
-      $('atual').textContent = 'sem status';
-      lampada.style.background = '';
-      lampada.classList.remove('acesa');
-    } else {
-      $('atual').textContent = `valor ${s} (fora da tabela)`;
-      lampada.style.background = '';
-      lampada.classList.remove('acesa');
-    }
-    botoes.forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.v) === s)));
+  const inteiro = (x) => { const n = parseInt(x, 10); return Number.isNaN(n) ? null : n; };
+  const nomeCor = (s) => (s === null || s === undefined || s < 0) ? 'sem status' : (CORES[s]?.nome ?? `valor ${s}`);
+  const ha = (s) => s < 60 ? `${Math.round(s)} s` : s < 3600 ? `${Math.round(s / 60)} min` : `${Math.round(s / 3600)} h`;
+
+  function idadeFita() {
+    if (!fita) return Infinity;
+    if (fita.em > 0) return Math.max(0, Date.now() / 1000 - fita.em);
+    return fitaVistaLocal ? (Date.now() - fitaVistaLocal) / 1000 : Infinity;
   }
 
-  function aviso(texto, erro = false) {
+  function aviso(texto, tipo = '') {
     $('aviso').textContent = texto;
-    $('aviso').classList.toggle('erro', erro);
+    $('aviso').className = 'aviso ' + tipo;
   }
 
-  const abertaEm = Date.now();
+  function render() {
+    const agora = Date.now();
+    const idade = idadeFita();
+    const online = idade < FITA_ONLINE_S;
+    let mostra, detalhe, velha = false;
 
-  function atualizarConexao() {
-    const ponto = $('ponto');
-    // Nunca leu: conta desde que a página abriu, senão ficaria em "conectando…" para sempre
-    const s = Math.round((Date.now() - (ultimaLeituraOk || abertaEm)) / 1000);
-    if (!ultimaLeituraOk && s < 10) return;
-    const ok = s < 15;
-    ponto.className = 'ponto ' + (ok ? 'ok' : 'falha');
-    $('conexao').textContent = ok ? 'dweet.cc conectado' : `sem resposta do dweet.cc há ${s} s`;
+    if (fita) {
+      mostra = fita.exibindo;
+      if (!online) {
+        velha = true;
+        detalhe = idade === Infinity
+          ? 'aguardando sinal da fita…'
+          : `fita sem sinal há ${ha(idade)}; esta é a última cor que ela confirmou`;
+      } else if (pedido !== null && pedido !== undefined && pedido !== fita.exibindo) {
+        const demorou = clique && clique.v === pedido && agora - clique.em > SEM_CONFIRMAR_MS;
+        detalhe = demorou
+          ? `pedido ${nomeCor(pedido)} ainda não confirmado pela fita`
+          : `pedido: ${nomeCor(pedido)}, aguardando a fita…`;
+      } else {
+        detalhe = `✓ confirmado pela fita há ${ha(idade)}`;
+      }
+    } else {
+      mostra = pedido;
+      velha = pedido !== undefined;
+      detalhe = pedido === undefined ? '' : 'a fita ainda não confirmou nenhuma cor (desligada, sem internet ou firmware antigo)';
+    }
+
+    const info = CORES[mostra];
+    const lampada = $('lampada');
+    $('atual').textContent = mostra === undefined ? 'lendo…' : nomeCor(mostra);
+    lampada.style.background = info ? info.css : '';
+    lampada.style.setProperty('--brilho', info && mostra !== 0 ? info.css : 'transparent');
+    lampada.classList.toggle('acesa', !!info && mostra !== 0 && !velha);
+    lampada.classList.toggle('velha', velha);
+    $('detalhe').textContent = detalhe;
+    $('detalhe').classList.toggle('ok', detalhe.startsWith('✓'));
+    botoes.forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.v) === pedido)));
+
+    // Retorno do último clique
+    if (clique && !clique.confirmado && fita && online && fita.exibindo === clique.v &&
+        (fita.em === 0 || fita.em * 1000 >= clique.em - 3000)) {
+      clique.confirmado = true;
+      const s = (agora - clique.em) / 1000;
+      aviso(`✓ A fita confirmou ${nomeCor(clique.v)} ${s < 1.5 ? 'na hora' : `em ${Math.round(s)} s`}.`, 'ok');
+    } else if (clique && !clique.confirmado && !clique.alertado && agora - clique.em > SEM_CONFIRMAR_MS) {
+      clique.alertado = true;
+      aviso(`A fita ainda não confirmou ${nomeCor(clique.v)}. Ela pode estar desligada ou sem internet; o pedido fica gravado e ela aplica quando voltar.`, 'erro');
+    }
+
+    // Rodapé
+    const semLeitura = Math.round((agora - (ultimaLeituraOk || abertaEm)) / 1000);
+    if (ultimaLeituraOk || semLeitura >= 10) {
+      const ok = ultimaLeituraOk && semLeitura < 15;
+      $('ponto').className = 'ponto ' + (ok ? 'ok' : 'falha');
+      $('conexao').textContent = ok ? 'dweet.cc conectado' : `sem resposta do dweet.cc há ${semLeitura} s`;
+    }
+    $('ponto-fita').className = 'ponto ' + (!fita ? '' : online ? 'ok' : 'falha');
+    $('fita-info').textContent = !fita ? 'fita: sem notícias'
+      : online ? `fita online · sinal ${fita.rssi} dBm · ${fita.versao}`
+      : 'fita offline';
+  }
+
+  // Sem limite, um fetch pendurado deixaria a página cega sem avisar
+  const buscar = (url) => fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(8000) });
+
+  async function lerCoisa(nome) {
+    const r = await buscar(`${API}/get/latest/dweet/for/${encodeURIComponent(nome)}`);
+    const j = await r.json();
+    return j.this === 'succeeded' ? (j.with?.[0]?.content ?? null) : null;
   }
 
   async function ler() {
     try {
-      const r = await fetch(`${API}/get/latest/dweet/for/${encodeURIComponent(coisa)}`, { cache: 'no-store' });
-      const j = await r.json();
+      const [p, f] = await Promise.all([lerCoisa(coisa), lerCoisa(coisa + '-fita')]);
       ultimaLeituraOk = Date.now();
-      if (enviando) return;   // não pisca o valor antigo enquanto um clique está a caminho
-      if (j.this !== 'succeeded') {
-        mostrarStatus(null);
-        return;
+      if (!enviando) pedido = p ? inteiro(p.status) : null;
+      if (f) {
+        const nova = {
+          exibindo: inteiro(f.exibindo), em: inteiro(f.em) || 0,
+          up: inteiro(f.up), rssi: inteiro(f.rssi), versao: String(f.versao ?? ''),
+        };
+        if (fita && nova.up !== fita.up) fitaVistaLocal = Date.now();
+        fita = nova;
+      } else {
+        fita = null;
       }
-      const s = parseInt(j.with?.[0]?.content?.status, 10);
-      mostrarStatus(Number.isNaN(s) ? null : s);
     } catch {
-      // atualizarConexao mostra a falha pelo tempo sem leitura
-    } finally {
-      atualizarConexao();
+      // a falha aparece no rodapé pelo tempo sem leitura
     }
+    render();
   }
 
   async function gravar(v) {
@@ -251,25 +319,31 @@
     botoes.forEach((b) => (b.disabled = true));
     aviso('Enviando…');
     try {
-      const r = await fetch(`${API}/dweet/for/${encodeURIComponent(coisa)}?status=${v}`, { cache: 'no-store' });
+      const r = await buscar(`${API}/dweet/for/${encodeURIComponent(coisa)}?status=${v}`);
       const j = await r.json();
       if (j.this !== 'succeeded') throw new Error(j.because || 'recusado');
       ultimaLeituraOk = Date.now();
-      mostrarStatus(v);
+      pedido = v;
+      const jaEstava = !!fita && idadeFita() < FITA_ONLINE_S && fita.exibindo === v;
+      clique = { v, em: Date.now(), confirmado: jaEstava, alertado: false };
       const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
-      aviso(`${CORES[v].nome} enviado às ${hora}. A fita muda em até uns 5 segundos.`);
+      aviso(jaEstava ? `A fita já está ${nomeCor(v)}.` : `${CORES[v].nome} enviado às ${hora}. Aguardando a fita confirmar…`, jaEstava ? 'ok' : '');
     } catch (e) {
-      aviso(`Não foi: ${e.message === 'Failed to fetch' ? 'sem contato com o dweet.cc' : e.message}. Tente de novo.`, true);
+      const semContato = e.message === 'Failed to fetch' || e.name === 'TimeoutError';
+      aviso(`Não foi: ${semContato ? 'sem contato com o dweet.cc' : e.message}. Tente de novo.`, 'erro');
     } finally {
       enviando = false;
       botoes.forEach((b) => (b.disabled = false));
-      atualizarConexao();
+      render();
     }
   }
 
   function iniciar() {
     coisa = coisaDoLink();
     clearInterval(timer);
+    pedido = undefined;
+    fita = null;
+    clique = null;
     if (!coisaValida(coisa)) {
       $('app').hidden = true;
       $('sem-coisa').hidden = false;
@@ -296,7 +370,7 @@
     if (coisaValida(c)) location.hash = c;
   });
   window.addEventListener('hashchange', iniciar);
-  setInterval(atualizarConexao, 1000);
+  setInterval(() => { if (coisa && !$('app').hidden) render(); }, 1000);
   iniciar();
 })();
 </script>
