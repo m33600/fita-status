@@ -214,10 +214,13 @@
     $('aviso').classList.toggle('erro', erro);
   }
 
+  const abertaEm = Date.now();
+
   function atualizarConexao() {
     const ponto = $('ponto');
-    if (!ultimaLeituraOk) return;
-    const s = Math.round((Date.now() - ultimaLeituraOk) / 1000);
+    // Nunca leu: conta desde que a página abriu, senão ficaria em "conectando…" para sempre
+    const s = Math.round((Date.now() - (ultimaLeituraOk || abertaEm)) / 1000);
+    if (!ultimaLeituraOk && s < 10) return;
     const ok = s < 15;
     ponto.className = 'ponto ' + (ok ? 'ok' : 'falha');
     $('conexao').textContent = ok ? 'dweet.cc conectado' : `sem resposta do dweet.cc há ${s} s`;
