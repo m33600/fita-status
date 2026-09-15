@@ -1,0 +1,301 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Fita de status</title>
+<style>
+  :root {
+    --fundo: #f4f2ee;
+    --cartao: #ffffff;
+    --texto: #1d1f23;
+    --suave: #6b6f76;
+    --borda: #dedad2;
+    --verde: #1f9d55;
+    --amarelo: #f0a500;
+    --vermelho: #d7372f;
+    --apagada: #3b4048;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --fundo: #15171a;
+      --cartao: #1f2226;
+      --texto: #eceae6;
+      --suave: #9a9ea5;
+      --borda: #30343a;
+      --apagada: #555b64;
+    }
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--fundo);
+    color: var(--texto);
+    font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    padding: 24px 16px 40px;
+  }
+  main { max-width: 560px; margin: 0 auto; }
+  h1 { font-size: 1.35rem; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .sub { color: var(--suave); margin: 0 0 20px; font-size: 0.95rem; }
+
+  .painel {
+    border-radius: 18px;
+    padding: 22px 20px;
+    background: var(--cartao);
+    border: 1px solid var(--borda);
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    margin-bottom: 18px;
+  }
+  .lampada {
+    width: 64px; height: 64px; flex: none;
+    border-radius: 50%;
+    background: var(--borda);
+    transition: background .25s, box-shadow .25s;
+  }
+  .lampada.acesa { box-shadow: 0 0 28px 4px var(--brilho, transparent); }
+  .rotulo { font-size: 0.85rem; color: var(--suave); }
+  .atual { font-size: 1.6rem; font-weight: 650; line-height: 1.2; }
+
+  .botoes {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+  button {
+    appearance: none;
+    border: 0;
+    border-radius: 16px;
+    min-height: 96px;
+    padding: 12px;
+    color: #fff;
+    font: inherit;
+    font-size: 1.2rem;
+    font-weight: 650;
+    cursor: pointer;
+    position: relative;
+    transition: transform .08s, filter .15s, outline-color .15s;
+    outline: 4px solid transparent;
+    outline-offset: 3px;
+  }
+  button:hover { filter: brightness(1.07); }
+  button:active { transform: scale(.97); }
+  button:focus-visible { outline-color: var(--texto); }
+  button[aria-pressed="true"] { outline-color: var(--texto); }
+  button:disabled { cursor: progress; filter: saturate(.6) brightness(.9); }
+  button .tecla {
+    position: absolute; top: 8px; right: 12px;
+    font-size: .75rem; font-weight: 500; opacity: .75;
+  }
+  .b1 { background: var(--verde); }
+  .b2 { background: var(--amarelo); color: #2a1f00; }
+  .b3 { background: var(--vermelho); }
+  .b0 { background: var(--apagada); }
+
+  .aviso {
+    min-height: 1.5em;
+    margin: 16px 2px 0;
+    font-size: .95rem;
+  }
+  .aviso.erro { color: var(--vermelho); }
+  .rodape {
+    margin-top: 22px;
+    padding-top: 14px;
+    border-top: 1px solid var(--borda);
+    color: var(--suave);
+    font-size: .85rem;
+    display: flex; flex-wrap: wrap; gap: 4px 14px;
+  }
+  .ponto { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--suave); margin-right: 6px; vertical-align: 1px; }
+  .ponto.ok { background: var(--verde); }
+  .ponto.falha { background: var(--vermelho); }
+
+  .sem-coisa { background: var(--cartao); border: 1px solid var(--borda); border-radius: 16px; padding: 18px; }
+  .sem-coisa input {
+    width: 100%; margin: 10px 0; padding: 12px; font: inherit;
+    border-radius: 10px; border: 1px solid var(--borda); background: var(--fundo); color: var(--texto);
+  }
+  .sem-coisa button { min-height: 48px; font-size: 1rem; background: var(--apagada); width: 100%; }
+
+  @media (min-width: 520px) {
+    .botoes { grid-template-columns: repeat(4, 1fr); }
+    button { min-height: 110px; }
+  }
+</style>
+</head>
+<body>
+<main>
+  <h1>Fita de status</h1>
+  <p class="sub">Toque numa cor e a fita da fábrica muda em poucos segundos.</p>
+
+  <section id="app" hidden>
+    <div class="painel" aria-live="polite">
+      <div class="lampada" id="lampada"></div>
+      <div>
+        <div class="rotulo">A fita está</div>
+        <div class="atual" id="atual">lendo…</div>
+      </div>
+    </div>
+
+    <div class="botoes" role="group" aria-label="Cor da fita">
+      <button class="b1" data-v="1"><span class="tecla">1</span>Verde</button>
+      <button class="b2" data-v="2"><span class="tecla">2</span>Amarelo</button>
+      <button class="b3" data-v="3"><span class="tecla">3</span>Vermelho</button>
+      <button class="b0" data-v="0"><span class="tecla">0</span>Apagar</button>
+    </div>
+
+    <p class="aviso" id="aviso" role="status"></p>
+
+    <div class="rodape">
+      <span><span class="ponto" id="ponto"></span><span id="conexao">conectando ao dweet.cc…</span></span>
+      <span id="nome"></span>
+    </div>
+  </section>
+
+  <section id="sem-coisa" class="sem-coisa" hidden>
+    <strong>Link incompleto</strong>
+    <p class="sub" style="margin:6px 0 0">O link precisa terminar com o nome da fita, depois de um <code>#</code>. Peça o link completo a quem enviou, ou cole o nome aqui:</p>
+    <form id="form-coisa">
+      <input id="campo-coisa" autocomplete="off" spellcheck="false" placeholder="fita-status-…">
+      <button type="submit">Abrir</button>
+    </form>
+  </section>
+</main>
+
+<script>
+(() => {
+  const API = 'https://dweet.cc';
+  const LEITURA_MS = 3000;
+  const CORES = {
+    0: { nome: 'Apagada',  css: 'var(--apagada)' },
+    1: { nome: 'Verde',    css: 'var(--verde)' },
+    2: { nome: 'Amarelo',  css: 'var(--amarelo)' },
+    3: { nome: 'Vermelho', css: 'var(--vermelho)' },
+  };
+
+  const $ = (id) => document.getElementById(id);
+  const botoes = [...document.querySelectorAll('.botoes button')];
+
+  // O nome da coisa no dweet.cc vem depois do # e nunca sai do navegador para o
+  // GitHub: o fragmento não é enviado ao servidor que hospeda a página.
+  const coisaDoLink = () => decodeURIComponent(location.hash.slice(1)).trim();
+  const coisaValida = (c) => /^[A-Za-z0-9_.\-]{6,120}$/.test(c);
+
+  let coisa = '';
+  let ultimaLeituraOk = 0;
+  let enviando = false;
+  let timer = null;
+
+  function mostrarStatus(s) {
+    const info = CORES[s];
+    const lampada = $('lampada');
+    if (info) {
+      $('atual').textContent = info.nome;
+      lampada.style.background = info.css;
+      lampada.style.setProperty('--brilho', s === 0 ? 'transparent' : info.css);
+      lampada.classList.toggle('acesa', s !== 0);
+    } else if (s === null) {
+      $('atual').textContent = 'sem status';
+      lampada.style.background = '';
+      lampada.classList.remove('acesa');
+    } else {
+      $('atual').textContent = `valor ${s} (fora da tabela)`;
+      lampada.style.background = '';
+      lampada.classList.remove('acesa');
+    }
+    botoes.forEach((b) => b.setAttribute('aria-pressed', String(Number(b.dataset.v) === s)));
+  }
+
+  function aviso(texto, erro = false) {
+    $('aviso').textContent = texto;
+    $('aviso').classList.toggle('erro', erro);
+  }
+
+  function atualizarConexao() {
+    const ponto = $('ponto');
+    if (!ultimaLeituraOk) return;
+    const s = Math.round((Date.now() - ultimaLeituraOk) / 1000);
+    const ok = s < 15;
+    ponto.className = 'ponto ' + (ok ? 'ok' : 'falha');
+    $('conexao').textContent = ok ? 'dweet.cc conectado' : `sem resposta do dweet.cc há ${s} s`;
+  }
+
+  async function ler() {
+    try {
+      const r = await fetch(`${API}/get/latest/dweet/for/${encodeURIComponent(coisa)}`, { cache: 'no-store' });
+      const j = await r.json();
+      ultimaLeituraOk = Date.now();
+      if (enviando) return;   // não pisca o valor antigo enquanto um clique está a caminho
+      if (j.this !== 'succeeded') {
+        mostrarStatus(null);
+        return;
+      }
+      const s = parseInt(j.with?.[0]?.content?.status, 10);
+      mostrarStatus(Number.isNaN(s) ? null : s);
+    } catch {
+      // atualizarConexao mostra a falha pelo tempo sem leitura
+    } finally {
+      atualizarConexao();
+    }
+  }
+
+  async function gravar(v) {
+    if (enviando) return;
+    enviando = true;
+    botoes.forEach((b) => (b.disabled = true));
+    aviso('Enviando…');
+    try {
+      const r = await fetch(`${API}/dweet/for/${encodeURIComponent(coisa)}?status=${v}`, { cache: 'no-store' });
+      const j = await r.json();
+      if (j.this !== 'succeeded') throw new Error(j.because || 'recusado');
+      ultimaLeituraOk = Date.now();
+      mostrarStatus(v);
+      const hora = new Date().toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+      aviso(`${CORES[v].nome} enviado às ${hora}. A fita muda em até uns 5 segundos.`);
+    } catch (e) {
+      aviso(`Não foi: ${e.message === 'Failed to fetch' ? 'sem contato com o dweet.cc' : e.message}. Tente de novo.`, true);
+    } finally {
+      enviando = false;
+      botoes.forEach((b) => (b.disabled = false));
+      atualizarConexao();
+    }
+  }
+
+  function iniciar() {
+    coisa = coisaDoLink();
+    clearInterval(timer);
+    if (!coisaValida(coisa)) {
+      $('app').hidden = true;
+      $('sem-coisa').hidden = false;
+      return;
+    }
+    $('sem-coisa').hidden = true;
+    $('app').hidden = false;
+    $('nome').textContent = `fita …${coisa.slice(-4)}`;
+    aviso('');
+    ler();
+    timer = setInterval(() => { if (!document.hidden) ler(); }, LEITURA_MS);
+  }
+
+  botoes.forEach((b) => b.addEventListener('click', () => gravar(Number(b.dataset.v))));
+  document.addEventListener('keydown', (e) => {
+    if ($('app').hidden || e.ctrlKey || e.metaKey || e.altKey) return;
+    if (e.target instanceof HTMLInputElement) return;
+    if (['0', '1', '2', '3'].includes(e.key)) gravar(Number(e.key));
+  });
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && coisa) ler(); });
+  $('form-coisa').addEventListener('submit', (e) => {
+    e.preventDefault();
+    const c = $('campo-coisa').value.trim();
+    if (coisaValida(c)) location.hash = c;
+  });
+  window.addEventListener('hashchange', iniciar);
+  setInterval(atualizarConexao, 1000);
+  iniciar();
+})();
+</script>
+</body>
+</html>
