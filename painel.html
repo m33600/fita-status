@@ -269,7 +269,9 @@
       if (j.this !== 'succeeded') return { ok: true, semDado: true };
       const d = j.with[0];
       const exibindo = parseInt(d.content?.exibindo, 10);
-      const criadoEm = Date.parse(d.created);
+      // O dweet.cc manda "AAAA-MM-DD HH:MM:SS" sem fuso — sem o "Z", o navegador lê como
+      // hora LOCAL (aqui, America/Sao_Paulo, UTC-3) e a idade sai errada por até 3 h.
+      const criadoEm = Date.parse(d.created.replace(' ', 'T') + 'Z');
       const idadeS = Number.isNaN(criadoEm) ? 0 : (Date.now() - criadoEm) / 1000;
       return { ok: true, semDado: false, exibindo: Number.isNaN(exibindo) ? -1 : exibindo, idadeS };
     } catch {
