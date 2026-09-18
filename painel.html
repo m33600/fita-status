@@ -81,6 +81,28 @@
   .detalhe.ok { color: var(--verde); }
   .detalhe.erro { color: var(--vermelho); }
   .abrir { font-size: .78rem; color: var(--acento); margin-top: auto; }
+  .nome { flex: 1 1 auto; }
+  .qr {
+    flex: none; width: 46px; height: 46px; padding: 3px; border-radius: 6px;
+    background: #fff; cursor: zoom-in;
+  }
+  .qr svg { display: block; width: 100%; height: 100%; }
+
+  .modal-qr {
+    position: fixed; inset: 0; background: rgba(0, 0, 0, .72);
+    display: flex; align-items: center; justify-content: center; padding: 24px; z-index: 10;
+  }
+  .modal-conteudo {
+    background: #fff; color: #1d1f23; border-radius: 18px; padding: 22px;
+    display: flex; flex-direction: column; align-items: center; gap: 14px; max-width: 340px;
+  }
+  .qr-grande { width: min(75vw, 280px); height: min(75vw, 280px); }
+  .qr-grande svg { display: block; width: 100%; height: 100%; }
+  .modal-rotulo { font-weight: 650; font-size: 1.05rem; text-align: center; }
+  .modal-conteudo button {
+    border: 0; border-radius: 10px; padding: 9px 18px; font: inherit; font-weight: 600;
+    cursor: pointer; background: var(--fundo); color: #1d1f23; border: 1px solid var(--borda);
+  }
 
   .rodape {
     margin-top: 20px;
@@ -148,12 +170,21 @@
 
   <section class="grade" id="grade" hidden></section>
 
+  <div class="modal-qr" id="modal-qr" hidden>
+    <div class="modal-conteudo">
+      <div class="qr-grande" id="qr-grande"></div>
+      <div class="modal-rotulo" id="modal-rotulo"></div>
+      <button id="modal-fechar" type="button">Fechar</button>
+    </div>
+  </div>
+
   <div class="rodape" id="rodape" hidden>
     <span class="ponto" id="ponto"></span>
     <span id="conexao">consultando dweet.cc…</span>
   </div>
 </main>
 
+<script src="qrcodegen.js"></script>
 <script>
 (() => {
   const INTERVALO_MS = 5000;
@@ -172,6 +203,39 @@
   let estado = {};       // coisa -> {exibindo, idadeS, ok}
   let timer = null;
   let ultimaLeituraOk = 0;
+  const qrCache = {}; // coisa -> svg do QR (o link não muda, então só precisa gerar uma vez)
+
+  function urlTeclado(coisa) {
+    // Resolvido pela própria URL do painel: funciona igual em status.settima.com.br,
+    // em m33600.github.io/fita-status e em qualquer cópia/teste local.
+    return new URL(`index.html#${coisa}`, location.href).href;
+  }
+
+  function qrSvg(texto) {
+    const qr = qrcodegen.QrCode.encodeText(texto, qrcodegen.QrCode.Ecc.MEDIUM);
+    const margem = 2;
+    const total = qr.size + margem * 2;
+    let modulos = '';
+    for (let y = 0; y < qr.size; y++) {
+      for (let x = 0; x < qr.size; x++) {
+        if (qr.getModule(x, y)) modulos += `<rect x="${x + margem}" y="${y + margem}" width="1" height="1"/>`;
+      }
+    }
+    // Sempre preto sobre branco, mesmo no tema escuro: é o que garante leitura pela câmera.
+    return `<svg viewBox="0 0 ${total} ${total}" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg">` +
+      `<rect width="${total}" height="${total}" fill="#fff"/><g fill="#000">${modulos}</g></svg>`;
+  }
+
+  function qrPara(coisa) {
+    if (!qrCache[coisa]) qrCache[coisa] = qrSvg(urlTeclado(coisa));
+    return qrCache[coisa];
+  }
+
+  function abrirModalQr(coisa, rotulo) {
+    $('qr-grande').innerHTML = qrPara(coisa);
+    $('modal-rotulo').textContent = `${rotulo} · aponte a câmera do celular`;
+    $('modal-qr').hidden = false;
+  }
 
   function decodeSeguro(s) { try { return decodeURIComponent(s); } catch { return s; } }
 
@@ -245,6 +309,19 @@
       nome.className = 'nome';
       nome.textContent = p.rotulo;
       topo.append(lampada, nome);
+
+      if (p.coisa) {
+        const qr = document.createElement('div');
+        qr.className = 'qr';
+        qr.title = 'Abrir o teclado deste posto no celular (toque para ampliar)';
+        qr.innerHTML = qrPara(p.coisa);
+        qr.addEventListener('click', (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          abrirModalQr(p.coisa, p.rotulo);
+        });
+        topo.append(qr);
+      }
 
       const detalhe = document.createElement('div');
       detalhe.className = 'detalhe';
@@ -384,6 +461,11 @@
       timer = setInterval(() => { if (!document.hidden) lerTudo(); }, INTERVALO_MS);
     }
   }
+
+  function fecharModalQr() { $('modal-qr').hidden = true; }
+  $('modal-fechar').addEventListener('click', fecharModalQr);
+  $('modal-qr').addEventListener('click', (ev) => { if (ev.target === $('modal-qr')) fecharModalQr(); });
+  document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') fecharModalQr(); });
 
   $('botao-editar').addEventListener('click', () => abrirEditor(postos));
   $('mais-linha').addEventListener('click', () => $('linhas').append(linhaEditor()));

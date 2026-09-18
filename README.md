@@ -56,6 +56,15 @@ Sem nenhum posto no link, a página abre um formulário para montar a lista (nom
 coisa + rótulo, uma linha por posto) e gera o link — inclusive para editar um painel
 que você já tem, clicando em "editar postos".
 
+Cada posto configurado também mostra um **QR code**, gerado no próprio navegador (a
+biblioteca [`qrcodegen.js`](https://www.nayuki.io/page/qr-code-generator-library), de
+domínio público, fica neste repositório — nada é gerado por um serviço de terceiro, o
+que também evitaria mandar o nome da coisa para fora). O QR aponta direto para o
+teclado daquele posto. Quem for operar uma fita leva o celular até o painel (no
+tablet ou no computador), aponta a câmera pro QR do posto certo e o celular abre o
+teclado já naquele posto — sem precisar mandar link por mensagem. Tocar no QR do
+próprio painel amplia ele na tela, para facilitar escanear de mais longe.
+
 ## Limites
 
 - O dweet.cc apaga cada coisa depois de 24 h sem gravação. A confirmação da fita
