@@ -1,0 +1,397 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Painel dos postos</title>
+<style>
+  :root {
+    --fundo: #f4f2ee;
+    --cartao: #ffffff;
+    --texto: #1d1f23;
+    --suave: #6b6f76;
+    --borda: #dedad2;
+    --verde: #1f9d55;
+    --amarelo: #f0a500;
+    --vermelho: #d7372f;
+    --apagada: #3b4048;
+    --acento: #2461c5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --fundo: #15171a;
+      --cartao: #1f2226;
+      --texto: #eceae6;
+      --suave: #9a9ea5;
+      --borda: #30343a;
+      --apagada: #555b64;
+      --acento: #6ea1ff;
+    }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--fundo);
+    color: var(--texto);
+    font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    padding: 24px 16px 40px;
+  }
+  main { max-width: 900px; margin: 0 auto; }
+  h1 { font-size: 1.35rem; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .sub { color: var(--suave); margin: 0 0 6px; font-size: 0.95rem; }
+  .cabecalho { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+  .link-editar { color: var(--acento); background: none; border: 0; font: inherit; font-size: .9rem; cursor: pointer; padding: 4px 0; text-decoration: underline; white-space: nowrap; }
+
+  .grade {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+  @media (min-width: 460px) { .grade { grid-template-columns: repeat(3, 1fr); } }
+  @media (min-width: 700px) { .grade { grid-template-columns: repeat(5, 1fr); } }
+
+  .posto {
+    border-radius: 16px;
+    padding: 14px;
+    background: var(--cartao);
+    border: 1px solid var(--borda);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    text-decoration: none;
+    color: inherit;
+    min-height: 108px;
+  }
+  a.posto { cursor: pointer; }
+  a.posto:hover { filter: brightness(1.04); }
+  .posto.vazio { opacity: .5; border-style: dashed; }
+  .posto .topo { display: flex; align-items: center; gap: 10px; }
+  .lampada {
+    width: 30px; height: 30px; flex: none; border-radius: 50%;
+    background: var(--borda);
+    transition: background .25s, box-shadow .25s, opacity .25s;
+  }
+  .lampada.acesa { box-shadow: 0 0 16px 3px var(--brilho, transparent); }
+  .lampada.velha { opacity: .4; }
+  .nome { font-weight: 650; line-height: 1.25; min-width: 0; overflow-wrap: anywhere; }
+  .detalhe { font-size: .82rem; color: var(--suave); }
+  .detalhe.ok { color: var(--verde); }
+  .detalhe.erro { color: var(--vermelho); }
+  .abrir { font-size: .78rem; color: var(--acento); margin-top: auto; }
+
+  .rodape {
+    margin-top: 20px;
+    padding-top: 14px;
+    border-top: 1px solid var(--borda);
+    color: var(--suave);
+    font-size: .85rem;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .ponto { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--suave); }
+  .ponto.ok { background: var(--verde); }
+  .ponto.falha { background: var(--vermelho); }
+
+  .editor {
+    background: var(--cartao); border: 1px solid var(--borda); border-radius: 16px;
+    padding: 18px 16px; margin-bottom: 18px;
+  }
+  .editor p.sub { margin-top: 0; }
+  .linha { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
+  .linha input {
+    flex: 1 1 auto; min-width: 0; padding: 10px; font: inherit;
+    border-radius: 10px; border: 1px solid var(--borda); background: var(--fundo); color: var(--texto);
+  }
+  .linha input.coisa { flex-basis: 55%; }
+  .linha input.rotulo { flex-basis: 35%; }
+  .linha button.remover {
+    flex: none; border: 0; background: none; color: var(--suave); cursor: pointer;
+    font-size: 1.1rem; padding: 6px 8px; line-height: 1;
+  }
+  .linha button.remover:hover { color: var(--vermelho); }
+  .editor .acoes { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+  .editor button.principal, .editor button.secundario {
+    border: 0; border-radius: 10px; padding: 10px 16px; font: inherit; font-weight: 600; cursor: pointer;
+  }
+  .editor button.principal { background: var(--acento); color: #fff; }
+  .editor button.secundario { background: var(--fundo); color: var(--texto); border: 1px solid var(--borda); }
+  .editor .erro-campo { color: var(--vermelho); font-size: .85rem; margin: -4px 0 8px; }
+  .link-pronto {
+    margin-bottom: 18px; font-size: .85rem; color: var(--suave); word-break: break-all;
+    background: var(--cartao); border: 1px solid var(--borda); border-radius: 10px; padding: 10px;
+  }
+</style>
+</head>
+<body>
+<main>
+  <div class="cabecalho">
+    <div>
+      <h1>Painel dos postos</h1>
+      <p class="sub">Visão geral das fitas de status da fábrica, atualizada a cada poucos segundos.</p>
+    </div>
+    <button class="link-editar" id="botao-editar" type="button">editar postos</button>
+  </div>
+
+  <section class="editor" id="editor" hidden>
+    <p class="sub">Cada linha é um posto: a coisa no dweet.cc (deixe em branco se ainda não existe) e um rótulo para mostrar aqui. O nome da coisa nunca é salvo neste site — ele só vive no link que você guardar.</p>
+    <div id="linhas"></div>
+    <p class="erro-campo" id="erro-editor" hidden></p>
+    <div class="acoes">
+      <button class="secundario" id="mais-linha" type="button">+ acrescentar posto</button>
+      <button class="principal" id="gerar-link" type="button">Gerar / atualizar painel</button>
+    </div>
+  </section>
+
+  <div class="link-pronto" id="link-pronto" hidden></div>
+
+  <section class="grade" id="grade" hidden></section>
+
+  <div class="rodape" id="rodape" hidden>
+    <span class="ponto" id="ponto"></span>
+    <span id="conexao">consultando dweet.cc…</span>
+  </div>
+</main>
+
+<script>
+(() => {
+  const INTERVALO_MS = 5000;
+  const ONLINE_S = 75;
+  const CORES = {
+    0: { nome: 'Apagada',  css: 'var(--apagada)' },
+    1: { nome: 'Verde',    css: 'var(--verde)' },
+    2: { nome: 'Amarelo',  css: 'var(--amarelo)' },
+    3: { nome: 'Vermelho', css: 'var(--vermelho)' },
+  };
+  const API = 'https://dweet.cc';
+  const COISA_VALIDA = /^[A-Za-z0-9_.\-]{6,120}$/;
+
+  const $ = (id) => document.getElementById(id);
+  let postos = [];       // [{coisa, rotulo}]
+  let estado = {};       // coisa -> {exibindo, idadeS, ok}
+  let timer = null;
+  let ultimaLeituraOk = 0;
+
+  function decodeSeguro(s) { try { return decodeURIComponent(s); } catch { return s; } }
+
+  function hashAtual() {
+    // Corta e decodifica CADA campo separadamente, nunca o hash inteiro de uma vez —
+    // um rótulo com "=" ou "|" vira %3D/%7C ao codificar, e decodificar tudo antes de
+    // cortar desfaria isso e embaralharia a lista.
+    const bruto = location.hash.slice(1);
+    if (!bruto.trim()) return [];
+    return bruto.split('|').map((par, i) => {
+      const pos = par.indexOf('=');
+      const coisa = decodeSeguro(pos === -1 ? '' : par.slice(0, pos)).trim();
+      const rotulo = decodeSeguro(pos === -1 ? par : par.slice(pos + 1)).trim() || `Posto ${i + 1}`;
+      return { coisa, rotulo };
+    });
+  }
+
+  function codificar(lista) {
+    return lista.map((p) => `${encodeURIComponent(p.coisa)}=${encodeURIComponent(p.rotulo)}`).join('|');
+  }
+
+  const nomeCor = (s) => CORES[s]?.nome ?? (s === -1 ? 'sem status' : `valor ${s}`);
+  const ha = (s) => s < 60 ? `${Math.round(s)} s` : s < 3600 ? `${Math.round(s / 60)} min` : `${Math.round(s / 3600)} h`;
+
+  const buscar = (url) => fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(8000) });
+
+  async function lerPosto(coisa) {
+    try {
+      const r = await buscar(`${API}/get/latest/dweet/for/${encodeURIComponent(coisa + '-fita')}`);
+      const j = await r.json();
+      if (j.this !== 'succeeded') return { ok: true, semDado: true };
+      const d = j.with[0];
+      const exibindo = parseInt(d.content?.exibindo, 10);
+      const criadoEm = Date.parse(d.created);
+      const idadeS = Number.isNaN(criadoEm) ? 0 : (Date.now() - criadoEm) / 1000;
+      return { ok: true, semDado: false, exibindo: Number.isNaN(exibindo) ? -1 : exibindo, idadeS };
+    } catch {
+      return { ok: false };
+    }
+  }
+
+  async function lerTudo() {
+    const comCoisa = postos.filter((p) => p.coisa);
+    if (comCoisa.length === 0) { render(); return; }
+    const resultados = await Promise.all(comCoisa.map((p) => lerPosto(p.coisa)));
+    let algumOk = false;
+    comCoisa.forEach((p, i) => { estado[p.coisa] = resultados[i]; if (resultados[i].ok) algumOk = true; });
+    if (algumOk) ultimaLeituraOk = Date.now();
+    render();
+  }
+
+  function render() {
+    const grade = $('grade');
+    grade.innerHTML = '';
+    postos.forEach((p) => {
+      const card = document.createElement(p.coisa ? 'a' : 'div');
+      card.className = 'posto';
+      if (p.coisa) {
+        card.href = `index.html#${encodeURIComponent(p.coisa)}`;
+        card.target = '_blank';
+        card.rel = 'noopener';
+      } else {
+        card.classList.add('vazio');
+      }
+
+      const topo = document.createElement('div');
+      topo.className = 'topo';
+      const lampada = document.createElement('div');
+      lampada.className = 'lampada';
+      const nome = document.createElement('div');
+      nome.className = 'nome';
+      nome.textContent = p.rotulo;
+      topo.append(lampada, nome);
+
+      const detalhe = document.createElement('div');
+      detalhe.className = 'detalhe';
+
+      if (!p.coisa) {
+        detalhe.textContent = 'ainda não configurado';
+      } else {
+        const e = estado[p.coisa];
+        if (!e) {
+          detalhe.textContent = 'lendo…';
+        } else if (!e.ok) {
+          detalhe.textContent = 'falha ao consultar o dweet.cc';
+          detalhe.classList.add('erro');
+        } else if (e.semDado) {
+          detalhe.textContent = 'sem notícia desta fita ainda';
+        } else {
+          const online = e.idadeS < ONLINE_S;
+          const info = CORES[e.exibindo];
+          lampada.style.background = info ? info.css : '';
+          lampada.style.setProperty('--brilho', info && e.exibindo !== 0 ? info.css : 'transparent');
+          lampada.classList.toggle('acesa', !!info && e.exibindo !== 0 && online);
+          lampada.classList.toggle('velha', !online);
+          if (online) {
+            detalhe.textContent = nomeCor(e.exibindo);
+            detalhe.classList.add('ok');
+          } else {
+            detalhe.textContent = `${nomeCor(e.exibindo)} · sem sinal há ${ha(e.idadeS)}`;
+          }
+        }
+      }
+      card.append(topo, detalhe);
+
+      if (p.coisa) {
+        const abrir = document.createElement('span');
+        abrir.className = 'abrir';
+        abrir.textContent = 'abrir teclado ↗';
+        card.append(abrir);
+      }
+      grade.append(card);
+    });
+    grade.hidden = postos.length === 0;
+
+    const rodape = $('rodape');
+    rodape.hidden = postos.length === 0;
+    if (postos.length) {
+      if (!postos.some((p) => p.coisa)) {
+        $('ponto').className = 'ponto';
+        $('conexao').textContent = 'nenhum posto configurado ainda';
+      } else {
+        const semLeitura = Math.round((Date.now() - (ultimaLeituraOk || Date.now())) / 1000);
+        const ok = ultimaLeituraOk && semLeitura < 15;
+        $('ponto').className = 'ponto ' + (ok ? 'ok' : 'falha');
+        $('conexao').textContent = ok ? 'dweet.cc conectado' : (ultimaLeituraOk ? `sem resposta há ${semLeitura} s` : 'consultando dweet.cc…');
+      }
+    }
+  }
+
+  // --- editor ---
+  function linhaEditor(coisa = '', rotulo = '') {
+    const linha = document.createElement('div');
+    linha.className = 'linha';
+    const iCoisa = document.createElement('input');
+    iCoisa.className = 'coisa';
+    iCoisa.placeholder = 'fita-status-… (em branco = ainda não existe)';
+    iCoisa.value = coisa;
+    iCoisa.autocomplete = 'off';
+    iCoisa.spellcheck = false;
+    const iRotulo = document.createElement('input');
+    iRotulo.className = 'rotulo';
+    iRotulo.placeholder = 'Rótulo (ex.: Posto 3)';
+    iRotulo.value = rotulo;
+    const remover = document.createElement('button');
+    remover.className = 'remover';
+    remover.type = 'button';
+    remover.title = 'Remover esta linha';
+    remover.textContent = '✕';
+    remover.addEventListener('click', () => linha.remove());
+    linha.append(iCoisa, iRotulo, remover);
+    return linha;
+  }
+
+  function abrirEditor(lista) {
+    clearInterval(timer);
+    $('grade').hidden = true;
+    $('rodape').hidden = true;
+    const linhas = $('linhas');
+    linhas.innerHTML = '';
+    const base = lista.length ? lista : Array.from({ length: 10 }, (_, i) => ({ coisa: '', rotulo: `Posto ${i + 1}` }));
+    const alvo = base.length < 10 ? base.concat(Array.from({ length: 10 - base.length }, (_, i) => ({ coisa: '', rotulo: `Posto ${base.length + i + 1}` }))) : base;
+    alvo.forEach((p) => linhas.append(linhaEditor(p.coisa, p.rotulo)));
+    $('erro-editor').hidden = true;
+    $('link-pronto').hidden = true;
+    $('editor').hidden = false;
+  }
+
+  function gerarLink() {
+    const linhas = [...$('linhas').querySelectorAll('.linha')];
+    const lista = [];
+    const erro = $('erro-editor');
+    erro.hidden = true;
+    for (const linha of linhas) {
+      const coisa = linha.querySelector('.coisa').value.trim();
+      const rotulo = linha.querySelector('.rotulo').value.trim();
+      if (!coisa && !rotulo) continue;
+      if (coisa && !COISA_VALIDA.test(coisa)) {
+        erro.textContent = `Nome de coisa inválido: "${coisa}" (só letras, números, "_", "." e "-", 6 a 120 caracteres).`;
+        erro.hidden = false;
+        return;
+      }
+      lista.push({ coisa, rotulo: rotulo || `Posto ${lista.length + 1}` });
+    }
+    if (lista.length === 0) {
+      erro.textContent = 'Preencha ao menos um posto (rótulo ou nome da coisa).';
+      erro.hidden = false;
+      return;
+    }
+    location.hash = codificar(lista);
+    const pronto = $('link-pronto');
+    pronto.hidden = false;
+    pronto.textContent = location.href;
+    $('editor').hidden = true;
+  }
+
+  function iniciar() {
+    postos = hashAtual();
+    estado = {};
+    ultimaLeituraOk = 0;
+    clearInterval(timer);
+    if (postos.length === 0) {
+      $('grade').hidden = true;
+      $('rodape').hidden = true;
+      abrirEditor([]);
+    } else {
+      $('editor').hidden = true;
+      render();
+      lerTudo();
+      timer = setInterval(() => { if (!document.hidden) lerTudo(); }, INTERVALO_MS);
+    }
+  }
+
+  $('botao-editar').addEventListener('click', () => abrirEditor(postos));
+  $('mais-linha').addEventListener('click', () => $('linhas').append(linhaEditor()));
+  $('gerar-link').addEventListener('click', gerarLink);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && postos.length) lerTudo(); });
+  window.addEventListener('hashchange', iniciar);
+  iniciar();
+})();
+</script>
+</body>
+</html>

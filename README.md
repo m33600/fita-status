@@ -39,6 +39,23 @@ lê essa coisa e mostra:
 
 O pedido fica gravado: se a fita estiver fora do ar, ela aplica quando voltar.
 
+## Painel de todos os postos
+
+**https://status.settima.com.br/painel.html#&lt;posto1&gt;=&lt;rótulo1&gt;|&lt;posto2&gt;=&lt;rótulo2&gt;|…**
+
+Mostra, num grid, a cor confirmada de vários postos ao mesmo tempo (pensado para
+começar com 10). Cada cartão do grid é um link para a página de trocar a cor
+(`index.html#<nome-da-coisa>`) daquele posto — não existe um "teclado" separado por
+posto: é a mesma página de sempre, cada posto com o seu nome depois do `#`.
+
+Assim como no `index.html`, **o nome de cada coisa só vive no link**, nunca no
+repositório. Um posto sem coisa ainda (rótulo sem nome depois do `=`) aparece como
+"ainda não configurado", sem tentar ler nada.
+
+Sem nenhum posto no link, a página abre um formulário para montar a lista (nome da
+coisa + rótulo, uma linha por posto) e gera o link — inclusive para editar um painel
+que você já tem, clicando em "editar postos".
+
 ## Limites
 
 - O dweet.cc apaga cada coisa depois de 24 h sem gravação. A confirmação da fita
