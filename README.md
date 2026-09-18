@@ -67,6 +67,12 @@ Sem nenhum posto no link, a página abre um formulário para montar a lista (nom
 coisa + rótulo, uma linha por posto) e gera o link — inclusive para editar um painel
 que você já tem, clicando em "editar postos".
 
+**A última lista gerada fica guardada no `localStorage` deste navegador** (nunca no
+repositório, nunca em servidor — só no seu próprio Chrome/Firefox). Abrir o painel de
+novo sem nada depois do `#` (por um link antigo, um atalho salvo, etc.) restaura
+essa lista sozinho, em vez de cair no formulário em branco — é o que evita perder um
+rótulo que você já tinha personalizado (ex.: "Solda", "Usinagem") num F5 ou reabertura.
+
 Cada posto configurado também mostra um **QR code**, gerado no próprio navegador (a
 biblioteca [`qrcodegen.js`](https://www.nayuki.io/page/qr-code-generator-library), de
 domínio público, fica neste repositório — nada é gerado por um serviço de terceiro, o

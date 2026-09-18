@@ -457,7 +457,24 @@
     $('editor').hidden = true;
   }
 
+  // Guarda o último hash só neste navegador (nunca no repositório, nunca em
+  // servidor nenhum) — assim abrir o painel por um link antigo/genérico não
+  // perde os nomes que você já cadastrou aqui.
+  const CHAVE_LOCAL = 'fita-status-painel';
+
   function iniciar() {
+    const bruto = location.hash.slice(1);
+    if (!bruto.trim()) {
+      let salvo = '';
+      try { salvo = localStorage.getItem(CHAVE_LOCAL) || ''; } catch {}
+      if (salvo.trim()) {
+        location.hash = salvo;   // dispara hashchange; iniciar() roda de novo já com ele
+        return;
+      }
+    } else {
+      try { localStorage.setItem(CHAVE_LOCAL, bruto); } catch {}
+    }
+
     postos = hashAtual();
     estado = {};
     ultimaLeituraOk = 0;
