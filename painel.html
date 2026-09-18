@@ -273,11 +273,16 @@
       if (j.this !== 'succeeded') return { ok: true, semDado: true };
       const d = j.with[0];
       const exibindo = parseInt(d.content?.exibindo, 10);
+      const rssi = parseInt(d.content?.rssi, 10);
       // O dweet.cc manda "AAAA-MM-DD HH:MM:SS" sem fuso — sem o "Z", o navegador lê como
       // hora LOCAL (aqui, America/Sao_Paulo, UTC-3) e a idade sai errada por até 3 h.
       const criadoEm = Date.parse(d.created.replace(' ', 'T') + 'Z');
       const idadeS = Number.isNaN(criadoEm) ? 0 : (Date.now() - criadoEm) / 1000;
-      return { ok: true, semDado: false, exibindo: Number.isNaN(exibindo) ? -1 : exibindo, idadeS };
+      return {
+        ok: true, semDado: false, idadeS,
+        exibindo: Number.isNaN(exibindo) ? -1 : exibindo,
+        rssi: Number.isNaN(rssi) ? null : rssi,
+      };
     } catch {
       return { ok: false };
     }
@@ -350,11 +355,12 @@
           lampada.style.setProperty('--brilho', info && e.exibindo !== 0 ? info.css : 'transparent');
           lampada.classList.toggle('acesa', !!info && e.exibindo !== 0 && online);
           lampada.classList.toggle('velha', !online);
+          const sinal = e.rssi !== null ? ` · ${e.rssi} dBm` : '';
           if (online) {
-            detalhe.textContent = nomeCor(e.exibindo);
+            detalhe.textContent = nomeCor(e.exibindo) + sinal;
             detalhe.classList.add('ok');
           } else {
-            detalhe.textContent = `${nomeCor(e.exibindo)} · sem sinal há ${ha(e.idadeS)}`;
+            detalhe.textContent = `${nomeCor(e.exibindo)} · sem sinal há ${ha(e.idadeS)}${sinal}`;
           }
         }
       }
