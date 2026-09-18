@@ -203,12 +203,15 @@
   let estado = {};       // coisa -> {exibindo, idadeS, ok}
   let timer = null;
   let ultimaLeituraOk = 0;
-  const qrCache = {}; // coisa -> svg do QR (o link não muda, então só precisa gerar uma vez)
+  const qrCache = {}; // "coisa|rotulo" -> svg do QR (o link não muda, então só precisa gerar uma vez)
 
-  function urlTeclado(coisa) {
+  function urlTeclado(coisa, rotulo) {
     // Resolvido pela própria URL do painel: funciona igual em status.settima.com.br,
     // em m33600.github.io/fita-status e em qualquer cópia/teste local.
-    return new URL(`index.html#${coisa}`, location.href).href;
+    const base = new URL('index.html', location.href).href;
+    // ":" nunca aparece numa coisa válida, então dá pra separar o rótulo sem
+    // ambiguidade; o teclado usa o rótulo só como título da página.
+    return rotulo ? `${base}#${coisa}:${encodeURIComponent(rotulo)}` : `${base}#${coisa}`;
   }
 
   function qrSvg(texto) {
@@ -226,13 +229,14 @@
       `<rect width="${total}" height="${total}" fill="#fff"/><g fill="#000">${modulos}</g></svg>`;
   }
 
-  function qrPara(coisa) {
-    if (!qrCache[coisa]) qrCache[coisa] = qrSvg(urlTeclado(coisa));
-    return qrCache[coisa];
+  function qrPara(coisa, rotulo) {
+    const chave = coisa + '|' + rotulo;
+    if (!qrCache[chave]) qrCache[chave] = qrSvg(urlTeclado(coisa, rotulo));
+    return qrCache[chave];
   }
 
   function abrirModalQr(coisa, rotulo) {
-    $('qr-grande').innerHTML = qrPara(coisa);
+    $('qr-grande').innerHTML = qrPara(coisa, rotulo);
     $('modal-rotulo').textContent = `${rotulo} · aponte a câmera do celular`;
     $('modal-qr').hidden = false;
   }
@@ -296,7 +300,7 @@
       const card = document.createElement(p.coisa ? 'a' : 'div');
       card.className = 'posto';
       if (p.coisa) {
-        card.href = `index.html#${encodeURIComponent(p.coisa)}`;
+        card.href = urlTeclado(p.coisa, p.rotulo);
         card.target = '_blank';
         card.rel = 'noopener';
       } else {
@@ -316,7 +320,7 @@
         const qr = document.createElement('div');
         qr.className = 'qr';
         qr.title = 'Abrir o teclado deste posto no celular (toque para ampliar)';
-        qr.innerHTML = qrPara(p.coisa);
+        qr.innerHTML = qrPara(p.coisa, p.rotulo);
         qr.addEventListener('click', (ev) => {
           ev.preventDefault();
           ev.stopPropagation();

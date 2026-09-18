@@ -133,7 +133,7 @@
 </head>
 <body>
 <main>
-  <h1>Fita de status</h1>
+  <h1 id="titulo">Fita de status</h1>
   <p class="sub">Toque numa cor e a fita da fábrica muda em poucos segundos.</p>
 
   <section id="app" hidden>
@@ -192,8 +192,18 @@
   const botoes = [...document.querySelectorAll('.botoes button')];
 
   // O nome da coisa no dweet.cc vem depois do # e nunca sai do navegador para o
-  // GitHub: o fragmento não é enviado ao servidor que hospeda a página.
-  const coisaDoLink = () => decodeURIComponent(location.hash.slice(1)).trim();
+  // GitHub: o fragmento não é enviado ao servidor que hospeda a página. Um rótulo
+  // opcional pode vir depois de ":" (ex. #coisa:Posto%207) — só para título da
+  // página; a coisa nunca tem ":", então cortar no primeiro sem decodificar antes
+  // é seguro mesmo se o rótulo tiver ":" ou "%" codificados.
+  function decodeSeguro(s) { try { return decodeURIComponent(s); } catch { return s; } }
+  function coisaERotuloDoLink() {
+    const bruto = location.hash.slice(1);
+    const pos = bruto.indexOf(':');
+    const coisa = decodeSeguro(pos === -1 ? bruto : bruto.slice(0, pos)).trim();
+    const rotulo = pos === -1 ? '' : decodeSeguro(bruto.slice(pos + 1)).trim();
+    return { coisa, rotulo };
+  }
   const coisaValida = (c) => /^[A-Za-z0-9_.\-]{6,120}$/.test(c);
 
   const abertaEm = Date.now();
@@ -339,7 +349,8 @@
   }
 
   function iniciar() {
-    coisa = coisaDoLink();
+    const { coisa: c, rotulo } = coisaERotuloDoLink();
+    coisa = c;
     clearInterval(timer);
     pedido = undefined;
     fita = null;
@@ -349,6 +360,9 @@
       $('sem-coisa').hidden = false;
       return;
     }
+    const titulo = rotulo || 'Fita de status';
+    document.title = titulo;
+    $('titulo').textContent = titulo;
     $('sem-coisa').hidden = true;
     $('app').hidden = false;
     $('nome').textContent = `fita …${coisa.slice(-4)}`;

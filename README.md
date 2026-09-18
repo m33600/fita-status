@@ -25,6 +25,16 @@ parte do endereço ao GitHub, então ela só existe no link que você compartilh
 Mandou o link para alguém que não deveria ter? Troque o `DWEET_COISA` no
 `secrets.h` do firmware, regrave a placa e envie o link novo.
 
+## Título da página (opcional)
+
+**https://m33600.github.io/fita-status/#&lt;nome-da-fita&gt;:&lt;rótulo&gt;**
+
+Depois do nome da fita, um `:` e um rótulo (ex. `Posto 7`, com espaço
+codificado como `%20` ou `+`) definem o título da aba e o título na página —
+sem isso, fica o genérico "Fita de status". Como o nome da fita nunca tem
+`:`, cortar no primeiro `:` do link não tem ambiguidade. O
+[painel](painel.html) já gera o link assim, usando o rótulo de cada posto.
+
 ## Confirmação da fita
 
 A fita (firmware v0.3 ou mais novo) grava o que está mostrando em
@@ -45,8 +55,9 @@ O pedido fica gravado: se a fita estiver fora do ar, ela aplica quando voltar.
 
 Mostra, num grid, a cor confirmada de vários postos ao mesmo tempo (pensado para
 começar com 10). Cada cartão do grid é um link para a página de trocar a cor
-(`index.html#<nome-da-coisa>`) daquele posto — não existe um "teclado" separado por
-posto: é a mesma página de sempre, cada posto com o seu nome depois do `#`.
+(`index.html#<nome-da-coisa>:<rótulo>`) daquele posto — não existe um "teclado"
+separado por posto: é a mesma página de sempre, cada posto com o seu nome (e o
+rótulo, que vira o título da página nela) depois do `#`.
 
 Assim como no `index.html`, **o nome de cada coisa só vive no link**, nunca no
 repositório. Um posto sem coisa ainda (rótulo sem nome depois do `=`) aparece como
