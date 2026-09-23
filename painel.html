@@ -44,6 +44,8 @@
   .sub { color: var(--suave); margin: 0 0 6px; font-size: 0.95rem; }
   .cabecalho { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
   .link-editar { color: var(--acento); background: none; border: 0; font: inherit; font-size: .9rem; cursor: pointer; padding: 4px 0; text-decoration: underline; white-space: nowrap; }
+  .acoes-cabecalho { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
+  .modal-aviso { font-size: .78rem; color: #5b6069; text-align: center; max-width: 260px; }
 
   .grade {
     display: grid;
@@ -99,10 +101,14 @@
   .qr-grande { width: min(75vw, 280px); height: min(75vw, 280px); }
   .qr-grande svg { display: block; width: 100%; height: 100%; }
   .modal-rotulo { font-weight: 650; font-size: 1.05rem; text-align: center; }
+  .modal-botoes { display: flex; gap: 10px; }
   .modal-conteudo button {
-    border: 0; border-radius: 10px; padding: 9px 18px; font: inherit; font-weight: 600;
-    cursor: pointer; background: var(--fundo); color: #1d1f23; border: 1px solid var(--borda);
+    /* O modal é branco sempre (QR precisa de contraste real), então os botões não
+       podem usar as variáveis do tema: no escuro davam texto escuro sobre fundo escuro. */
+    border-radius: 10px; padding: 9px 18px; font: inherit; font-weight: 600;
+    cursor: pointer; background: #eceef1; color: #1d1f23; border: 1px solid #c8ccd2;
   }
+  .modal-conteudo button:hover { background: #e0e3e8; }
 
   .rodape {
     margin-top: 20px;
@@ -153,7 +159,10 @@
       <h1>Painel dos postos</h1>
       <p class="sub">Visão geral das fitas de status da fábrica, atualizada a cada poucos segundos.</p>
     </div>
-    <button class="link-editar" id="botao-editar" type="button">editar postos</button>
+    <div class="acoes-cabecalho">
+      <button class="link-editar" id="botao-qr-painel" type="button" hidden>QR deste painel</button>
+      <button class="link-editar" id="botao-editar" type="button">editar postos</button>
+    </div>
   </div>
 
   <section class="editor" id="editor" hidden>
@@ -174,7 +183,11 @@
     <div class="modal-conteudo">
       <div class="qr-grande" id="qr-grande"></div>
       <div class="modal-rotulo" id="modal-rotulo"></div>
-      <button id="modal-fechar" type="button">Fechar</button>
+      <p class="modal-aviso" id="modal-aviso" hidden></p>
+      <div class="modal-botoes">
+        <button id="modal-baixar" type="button">Baixar PNG</button>
+        <button id="modal-fechar" type="button">Fechar</button>
+      </div>
     </div>
   </div>
 
@@ -235,10 +248,64 @@
     return qrCache[chave];
   }
 
-  function abrirModalQr(coisa, rotulo) {
-    $('qr-grande').innerHTML = qrPara(coisa, rotulo);
-    $('modal-rotulo').textContent = `${rotulo} · aponte a câmera do celular`;
+  // O modal serve tanto ao QR de um posto quanto ao do painel inteiro; guarda o
+  // SVG mostrado para o "Baixar PNG" não precisar gerar de novo.
+  let qrNoModal = { svg: '', arquivo: 'qr.png' };
+
+  function abrirModalComQr(svg, titulo, arquivo, aviso) {
+    qrNoModal = { svg, arquivo };
+    $('qr-grande').innerHTML = svg;
+    $('modal-rotulo').textContent = titulo;
+    const campoAviso = $('modal-aviso');
+    campoAviso.textContent = aviso || '';
+    campoAviso.hidden = !aviso;
     $('modal-qr').hidden = false;
+  }
+
+  function abrirModalQr(coisa, rotulo) {
+    abrirModalComQr(qrPara(coisa, rotulo), `${rotulo} · aponte a câmera do celular`,
+      `qr-${nomeArquivo(rotulo)}.png`);
+  }
+
+  // O QR do painel é a URL desta página, hash e tudo: quem lê abre um painel
+  // igual a este, com os mesmos postos. É assim que se multiplica um painel —
+  // e é também por isso que ele carrega os nomes das coisas, como o link.
+  function abrirModalQrPainel() {
+    abrirModalComQr(qrSvg(location.href), 'Painel dos postos · aponte a câmera do celular',
+      'qr-painel-dos-postos.png',
+      'Este QR contém o link completo, com os nomes das coisas. Quem lê consegue trocar o status de qualquer posto — trate como trataria o link.');
+  }
+
+  function nomeArquivo(texto) {
+    return (texto || 'posto').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'posto';
+  }
+
+  // Imprimir e colar na bancada pede um arquivo, não uma tela. O SVG vira PNG
+  // no próprio navegador (canvas), sem serviço nenhum no meio — o mesmo motivo
+  // de a biblioteca de QR estar vendorizada aqui.
+  function baixarQrPng(lado = 720) {
+    const urlSvg = URL.createObjectURL(new Blob([qrNoModal.svg], { type: 'image/svg+xml' }));
+    const img = new Image();
+    img.onload = () => {
+      const tela = document.createElement('canvas');
+      tela.width = tela.height = lado;
+      const ctx = tela.getContext('2d');
+      ctx.imageSmoothingEnabled = false;      // módulo de QR é quadrado; suavizar só borra
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, lado, lado);
+      ctx.drawImage(img, 0, 0, lado, lado);
+      URL.revokeObjectURL(urlSvg);
+      tela.toBlob((png) => {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(png);
+        a.download = qrNoModal.arquivo;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+      }, 'image/png');
+    };
+    img.onerror = () => { URL.revokeObjectURL(urlSvg); };
+    img.src = urlSvg;
   }
 
   function decodeSeguro(s) { try { return decodeURIComponent(s); } catch { return s; } }
@@ -416,6 +483,7 @@
   }
 
   function abrirEditor(lista) {
+    $('botao-qr-painel').hidden = true;
     clearInterval(timer);
     $('grade').hidden = true;
     $('rodape').hidden = true;
@@ -479,6 +547,7 @@
     estado = {};
     ultimaLeituraOk = 0;
     clearInterval(timer);
+    $('botao-qr-painel').hidden = postos.length === 0;   // sem postos, não há painel a multiplicar
     if (postos.length === 0) {
       $('grade').hidden = true;
       $('rodape').hidden = true;
@@ -497,6 +566,8 @@
   document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') fecharModalQr(); });
 
   $('botao-editar').addEventListener('click', () => abrirEditor(postos));
+  $('botao-qr-painel').addEventListener('click', abrirModalQrPainel);
+  $('modal-baixar').addEventListener('click', baixarQrPng);
   $('mais-linha').addEventListener('click', () => $('linhas').append(linhaEditor()));
   $('gerar-link').addEventListener('click', gerarLink);
   document.addEventListener('visibilitychange', () => { if (!document.hidden && postos.length) lerTudo(); });
