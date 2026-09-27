@@ -166,7 +166,7 @@
   </div>
 
   <section class="editor" id="editor" hidden>
-    <p class="sub">Cada linha é um posto: a coisa no dweet.cc (deixe em branco se ainda não existe) e um rótulo para mostrar aqui. O nome da coisa nunca é salvo neste site — ele só vive no link que você guardar.</p>
+    <p class="sub">Cada linha é um posto: a coisa no servidor (deixe em branco se ainda não existe) e um rótulo para mostrar aqui. O nome da coisa nunca é salvo neste site — ele só vive no link que você guardar.</p>
     <div id="linhas"></div>
     <p class="erro-campo" id="erro-editor" hidden></p>
     <div class="acoes">
@@ -193,7 +193,7 @@
 
   <div class="rodape" id="rodape" hidden>
     <span class="ponto" id="ponto"></span>
-    <span id="conexao">consultando dweet.cc…</span>
+    <span id="conexao">consultando servidor…</span>
   </div>
 </main>
 
@@ -208,7 +208,7 @@
     2: { nome: 'Amarelo',  css: 'var(--amarelo)' },
     3: { nome: 'Vermelho', css: 'var(--vermelho)' },
   };
-  const API = 'https://dweet.cc';
+  const API = 'https://dweet.settima.com.br';
   const COISA_VALIDA = /^[A-Za-z0-9_.\-]{6,120}$/;
 
   const $ = (id) => document.getElementById(id);
@@ -341,7 +341,7 @@
       const d = j.with[0];
       const exibindo = parseInt(d.content?.exibindo, 10);
       const rssi = parseInt(d.content?.rssi, 10);
-      // O dweet.cc manda "AAAA-MM-DD HH:MM:SS" sem fuso — sem o "Z", o navegador lê como
+      // O servidor manda "AAAA-MM-DD HH:MM:SS" sem fuso — sem o "Z", o navegador lê como
       // hora LOCAL (aqui, America/Sao_Paulo, UTC-3) e a idade sai errada por até 3 h.
       const criadoEm = Date.parse(d.created.replace(' ', 'T') + 'Z');
       const idadeS = Number.isNaN(criadoEm) ? 0 : (Date.now() - criadoEm) / 1000;
@@ -411,7 +411,7 @@
         if (!e) {
           detalhe.textContent = 'lendo…';
         } else if (!e.ok) {
-          detalhe.textContent = 'falha ao consultar o dweet.cc';
+          detalhe.textContent = 'falha ao consultar o servidor';
           detalhe.classList.add('erro');
         } else if (e.semDado) {
           detalhe.textContent = 'sem notícia desta fita ainda';
@@ -453,7 +453,7 @@
         const semLeitura = Math.round((Date.now() - (ultimaLeituraOk || Date.now())) / 1000);
         const ok = ultimaLeituraOk && semLeitura < 15;
         $('ponto').className = 'ponto ' + (ok ? 'ok' : 'falha');
-        $('conexao').textContent = ok ? 'dweet.cc conectado' : (ultimaLeituraOk ? `sem resposta há ${semLeitura} s` : 'consultando dweet.cc…');
+        $('conexao').textContent = ok ? 'servidor conectado' : (ultimaLeituraOk ? `sem resposta há ${semLeitura} s` : 'consultando servidor…');
       }
     }
   }

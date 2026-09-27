@@ -157,7 +157,7 @@
 
     <div class="rodape">
       <span><span class="ponto" id="ponto-fita"></span><span id="fita-info">fita: aguardando…</span></span>
-      <span><span class="ponto" id="ponto"></span><span id="conexao">conectando ao dweet.cc…</span></span>
+      <span><span class="ponto" id="ponto"></span><span id="conexao">conectando ao servidor…</span></span>
       <span id="nome"></span>
     </div>
   </section>
@@ -175,9 +175,9 @@
 <script>
 (() => {
   // ?api= só vale com a página aberta no próprio PC (teste por proxy local).
-  // Publicada, ela fala sempre com o dweet.cc — um link malicioso não desvia o nome da fita.
+  // Publicada, ela fala sempre com o dweet-local na nuvem — um link malicioso não desvia o nome da fita.
   const LOCAL = ['127.0.0.1', 'localhost'].includes(location.hostname);
-  const API = (LOCAL && new URLSearchParams(location.search).get('api')) || 'https://dweet.cc';
+  const API = (LOCAL && new URLSearchParams(location.search).get('api')) || 'https://dweet.settima.com.br';
   const LEITURA_MS = 3000;
   const FITA_ONLINE_S = 75;         // a fita confirma a cada 30 s
   const SEM_CONFIRMAR_MS = 20000;   // depois disso o pedido é dado como não atendido
@@ -191,7 +191,7 @@
   const $ = (id) => document.getElementById(id);
   const botoes = [...document.querySelectorAll('.botoes button')];
 
-  // O nome da coisa no dweet.cc vem depois do # e nunca sai do navegador para o
+  // O nome da coisa no servidor vem depois do # e nunca sai do navegador para o
   // GitHub: o fragmento não é enviado ao servidor que hospeda a página. Um rótulo
   // opcional pode vir depois de ":" (ex. #coisa:Posto%207) — só para título da
   // página; a coisa nunca tem ":", então cortar no primeiro sem decodificar antes
@@ -285,7 +285,7 @@
     if (ultimaLeituraOk || semLeitura >= 10) {
       const ok = ultimaLeituraOk && semLeitura < 15;
       $('ponto').className = 'ponto ' + (ok ? 'ok' : 'falha');
-      $('conexao').textContent = ok ? 'dweet.cc conectado' : `sem resposta do dweet.cc há ${semLeitura} s`;
+      $('conexao').textContent = ok ? 'servidor conectado' : `sem resposta do servidor há ${semLeitura} s`;
     }
     $('ponto-fita').className = 'ponto ' + (!fita ? '' : online ? 'ok' : 'falha');
     $('fita-info').textContent = !fita ? 'fita: sem notícias'
@@ -340,7 +340,7 @@
       aviso(jaEstava ? `A fita já está ${nomeCor(v)}.` : `${CORES[v].nome} enviado às ${hora}. Aguardando a fita confirmar…`, jaEstava ? 'ok' : '');
     } catch (e) {
       const semContato = e.message === 'Failed to fetch' || e.name === 'TimeoutError';
-      aviso(`Não foi: ${semContato ? 'sem contato com o dweet.cc' : e.message}. Tente de novo.`, 'erro');
+      aviso(`Não foi: ${semContato ? 'sem contato com o servidor' : e.message}. Tente de novo.`, 'erro');
     } finally {
       enviando = false;
       botoes.forEach((b) => (b.disabled = false));
