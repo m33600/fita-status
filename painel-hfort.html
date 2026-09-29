@@ -1,0 +1,960 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+<title>Painel HFORT — postos</title>
+<style>
+  :root {
+    --fundo: #f4f2ee;
+    --cartao: #ffffff;
+    --texto: #1d1f23;
+    --suave: #6b6f76;
+    --borda: #dedad2;
+    --verde: #1f9d55;
+    --amarelo: #f0a500;
+    --vermelho: #d7372f;
+    --apagada: #3b4048;
+    --acento: #2461c5;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --fundo: #15171a;
+      --cartao: #1f2226;
+      --texto: #eceae6;
+      --suave: #9a9ea5;
+      --borda: #30343a;
+      --apagada: #555b64;
+      --acento: #6ea1ff;
+    }
+  }
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background: var(--fundo);
+    color: var(--texto);
+    font: 16px/1.45 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    padding: 24px 16px 40px;
+  }
+  main { max-width: 900px; margin: 0 auto; }
+  h1 { font-size: 1.35rem; margin: 0 0 4px; letter-spacing: -0.01em; }
+  .sub { color: var(--suave); margin: 0 0 6px; font-size: 0.95rem; }
+  .cabecalho { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 18px; }
+  /* O logo HFORT (escudo vermelho + nome em branco) foi feito para fundo escuro —
+     a caixa própria garante leitura nos dois temas da página, sem depender dele. */
+  .marca-hfort { display: flex; align-items: center; gap: 12px; background: #0b0d10; padding: 8px 14px 8px 10px; border-radius: 12px; }
+  .marca-hfort svg { height: 38px; width: auto; display: block; }
+  .marca-hfort .titulos h1 { color: #eceae6; }
+  .marca-hfort .titulos .sub { color: #9a9ea5; margin: 0; }
+  .link-editar { color: var(--acento); background: none; border: 0; font: inherit; font-size: .9rem; cursor: pointer; padding: 4px 0; text-decoration: underline; white-space: nowrap; }
+  .acoes-cabecalho { display: flex; gap: 14px; align-items: flex-start; flex-wrap: wrap; }
+  .modal-aviso { font-size: .78rem; color: #5b6069; text-align: center; max-width: 260px; }
+
+  .grade {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+  @media (min-width: 460px) { .grade { grid-template-columns: repeat(3, 1fr); } }
+  @media (min-width: 700px) { .grade { grid-template-columns: repeat(5, 1fr); } }
+
+  .posto {
+    border-radius: 16px;
+    padding: 14px;
+    background: var(--cartao);
+    border: 1px solid var(--borda);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    text-decoration: none;
+    color: inherit;
+    min-height: 108px;
+  }
+  a.posto { cursor: pointer; }
+  a.posto:hover { filter: brightness(1.04); }
+  .posto.vazio { opacity: .5; border-style: dashed; }
+  .posto .topo { display: flex; align-items: center; gap: 10px; }
+  .lampada {
+    width: 30px; height: 30px; flex: none; border-radius: 50%;
+    background: var(--borda);
+    transition: background .25s, box-shadow .25s, opacity .25s;
+  }
+  .lampada.acesa { box-shadow: 0 0 16px 3px var(--brilho, transparent); }
+  .lampada.velha { opacity: .4; }
+  .nome { font-weight: 650; line-height: 1.25; min-width: 0; overflow-wrap: anywhere; }
+  .detalhe { font-size: .82rem; color: var(--suave); }
+  .detalhe.ok { color: var(--verde); }
+  .detalhe.erro { color: var(--vermelho); }
+  .abrir { font-size: .78rem; color: var(--acento); margin-top: auto; }
+  .nome { flex: 1 1 auto; }
+  .qr {
+    flex: none; width: 46px; height: 46px; padding: 3px; border-radius: 6px;
+    background: #fff; cursor: zoom-in;
+  }
+  .qr svg { display: block; width: 100%; height: 100%; }
+
+  .modal-qr {
+    position: fixed; inset: 0; background: rgba(0, 0, 0, .72);
+    display: flex; align-items: center; justify-content: center; padding: 24px; z-index: 10;
+  }
+  .modal-conteudo {
+    background: #fff; color: #1d1f23; border-radius: 18px; padding: 22px;
+    display: flex; flex-direction: column; align-items: center; gap: 14px; max-width: 340px;
+  }
+  .qr-grande { width: min(75vw, 280px); height: min(75vw, 280px); }
+  .qr-grande svg { display: block; width: 100%; height: 100%; }
+  .modal-rotulo { font-weight: 650; font-size: 1.05rem; text-align: center; }
+  .modal-botoes { display: flex; gap: 10px; }
+  .modal-conteudo button {
+    /* O modal é branco sempre (QR precisa de contraste real), então os botões não
+       podem usar as variáveis do tema: no escuro davam texto escuro sobre fundo escuro. */
+    border-radius: 10px; padding: 9px 18px; font: inherit; font-weight: 600;
+    cursor: pointer; background: #eceef1; color: #1d1f23; border: 1px solid #c8ccd2;
+  }
+  .modal-conteudo button:hover { background: #e0e3e8; }
+
+  .rodape {
+    margin-top: 20px;
+    padding-top: 14px;
+    border-top: 1px solid var(--borda);
+    color: var(--suave);
+    font-size: .85rem;
+    display: flex; align-items: center; gap: 6px;
+  }
+  .ponto { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--suave); }
+  .ponto.ok { background: var(--verde); }
+  .ponto.falha { background: var(--vermelho); }
+
+  .editor {
+    background: var(--cartao); border: 1px solid var(--borda); border-radius: 16px;
+    padding: 18px 16px; margin-bottom: 18px;
+  }
+  .editor p.sub { margin-top: 0; }
+  .linha { display: flex; gap: 8px; margin-bottom: 8px; align-items: center; }
+  .linha input {
+    flex: 1 1 auto; min-width: 0; padding: 10px; font: inherit;
+    border-radius: 10px; border: 1px solid var(--borda); background: var(--fundo); color: var(--texto);
+  }
+  .linha input.coisa { flex-basis: 55%; }
+  .linha input.rotulo { flex-basis: 35%; }
+  .linha button.remover {
+    flex: none; border: 0; background: none; color: var(--suave); cursor: pointer;
+    font-size: 1.1rem; padding: 6px 8px; line-height: 1;
+  }
+  .linha button.remover:hover { color: var(--vermelho); }
+  .editor .acoes { display: flex; gap: 10px; margin-top: 14px; flex-wrap: wrap; }
+  .editor button.principal, .editor button.secundario {
+    border: 0; border-radius: 10px; padding: 10px 16px; font: inherit; font-weight: 600; cursor: pointer;
+  }
+  .editor button.principal { background: var(--acento); color: #fff; }
+  .editor button.secundario { background: var(--fundo); color: var(--texto); border: 1px solid var(--borda); }
+  .editor .erro-campo { color: var(--vermelho); font-size: .85rem; margin: -4px 0 8px; }
+  .link-pronto {
+    margin-bottom: 18px; font-size: .85rem; color: var(--suave); word-break: break-all;
+    background: var(--cartao); border: 1px solid var(--borda); border-radius: 10px; padding: 10px;
+  }
+</style>
+</head>
+<body>
+<main>
+  <div class="cabecalho">
+    <div class="marca-hfort">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1600 1840" role="img" aria-label="HFORT">
+<g transform="translate(0,1840) scale(0.1,-0.1)">
+<path fill="#960104" d="M1570 17941 c-14 -27 -14 -2975 0 -3002 6 -10 19 -19 30 -19 26 0 40
+-29 40 -85 0 -25 7 -57 16 -70 15 -23 15 -27 0 -50 -14 -22 -16 -135 -16
+-1210 0 -1221 0 -1225 -40 -1225 -11 0 -24 -9 -30 -19 -16 -31 -14 -4182 3
+-4204 8 -11 30 -17 71 -19 44 -2 61 -7 67 -21 5 -9 13 -25 18 -35 6 -12 24
+-18 71 -22 47 -4 65 -10 71 -22 5 -10 13 -26 18 -35 6 -13 24 -19 71 -23 47
+-4 65 -10 71 -22 5 -10 13 -26 18 -35 6 -13 24 -19 71 -23 47 -4 65 -10 71
+-22 5 -10 13 -26 18 -35 6 -13 24 -19 71 -23 64 -5 65 -6 90 -60 5 -10 28 -17
+70 -20 47 -4 65 -10 71 -22 5 -10 13 -26 18 -35 6 -13 24 -19 71 -23 47 -4 65
+-10 71 -23 5 -9 13 -25 18 -35 6 -12 24 -18 71 -22 47 -4 65 -10 71 -23 5 -9
+13 -25 18 -35 6 -12 24 -18 71 -22 47 -4 65 -10 71 -22 5 -10 13 -26 18 -35 6
+-13 24 -19 71 -23 42 -3 65 -10 70 -20 25 -54 26 -55 90 -60 64 -5 65 -6 90
+-60 5 -10 28 -17 70 -20 47 -4 65 -10 71 -22 5 -10 13 -26 18 -35 6 -13 24
+-19 71 -23 64 -5 65 -6 90 -60 5 -10 28 -17 70 -20 64 -5 65 -6 90 -60 5 -10
+28 -17 70 -20 64 -5 65 -6 90 -60 5 -10 28 -17 70 -20 47 -4 65 -10 71 -22 5
+-10 13 -26 18 -35 6 -13 24 -19 71 -23 47 -4 65 -10 71 -22 5 -10 13 -26 18
+-35 6 -13 24 -19 71 -23 64 -5 65 -6 90 -60 5 -10 28 -17 70 -20 42 -3 65 -10
+70 -20 25 -54 26 -55 90 -60 64 -5 65 -6 90 -60 5 -10 28 -17 70 -20 42 -3 65
+-10 70 -20 25 -54 26 -55 90 -60 42 -3 65 -10 70 -20 25 -54 26 -55 90 -60 47
+-4 65 -10 71 -22 5 -10 13 -26 18 -35 6 -13 24 -19 71 -23 64 -5 65 -6 90 -60
+5 -10 28 -17 70 -20 64 -5 65 -6 90 -60 5 -10 28 -17 70 -20 42 -3 65 -10 70
+-20 25 -54 26 -55 90 -60 42 -3 65 -10 70 -20 25 -54 26 -55 90 -60 47 -4 65
+-10 71 -22 5 -10 13 -26 18 -35 6 -13 24 -19 71 -23 47 -4 65 -10 71 -22 5
+-10 13 -26 18 -35 6 -13 24 -19 71 -23 64 -5 65 -6 90 -60 25 -53 150 -17 150
+43 0 19 13 45 40 77 l40 48 0 173 c0 157 2 176 20 199 11 14 20 32 20 40 0 8
+9 26 20 40 16 20 20 41 20 113 0 96 10 127 40 127 30 0 40 31 40 127 0 72 4
+93 20 113 11 14 20 32 20 40 0 8 9 26 20 40 15 20 20 41 20 99 0 71 1 75 40
+121 34 41 40 55 40 95 0 56 14 85 40 85 28 0 40 30 40 105 0 64 2 70 40 115
+34 41 40 55 40 95 0 56 14 85 40 85 25 0 40 29 40 80 0 51 15 80 40 80 25 0
+40 29 40 80 0 50 14 80 38 80 22 0 42 19 42 38 0 8 18 36 40 62 25 30 40 58
+40 75 0 37 17 65 40 65 26 0 40 29 40 82 0 48 15 74 44 80 10 1 23 11 27 21 5
+9 13 25 18 35 4 9 17 19 27 20 29 6 44 32 44 80 0 52 14 82 39 82 21 0 37 17
+42 44 2 10 12 23 22 27 9 5 25 13 35 18 9 4 19 17 21 27 2 10 21 40 42 65 26
+31 39 57 39 76 0 34 17 60 44 65 10 1 23 11 27 21 5 9 13 25 17 34 5 10 19 20
+32 23 13 3 27 13 32 23 4 9 12 25 17 35 4 9 17 19 27 20 30 6 44 32 44 83 0
+67 31 97 64 63 12 -12 16 -37 16 -103 0 -91 9 -117 44 -123 10 -1 23 -11 27
+-20 5 -10 13 -26 17 -35 5 -10 19 -20 32 -23 13 -3 27 -13 32 -23 4 -9 12 -25
+16 -34 5 -10 19 -20 32 -23 13 -3 27 -13 32 -23 4 -9 12 -25 17 -34 4 -10 17
+-20 27 -21 30 -6 44 -32 44 -82 0 -50 14 -76 44 -82 10 -1 23 -11 27 -20 5
+-10 13 -26 18 -35 4 -10 17 -20 27 -21 30 -6 44 -32 44 -82 0 -50 14 -76 44
+-82 10 -1 23 -11 27 -20 5 -10 13 -26 18 -35 4 -10 17 -20 27 -21 29 -6 44
+-32 44 -80 0 -53 14 -82 40 -82 25 0 40 -29 40 -80 0 -50 14 -80 38 -80 22 0
+42 -19 42 -38 0 -8 18 -36 40 -62 25 -30 40 -58 40 -75 0 -37 17 -65 40 -65
+26 0 40 -29 40 -87 0 -32 7 -56 20 -73 11 -14 20 -32 20 -40 0 -8 9 -26 20
+-40 13 -17 20 -41 20 -73 0 -58 14 -87 40 -87 25 0 40 -29 40 -80 0 -51 15
+-80 40 -80 30 0 40 -31 40 -120 0 -89 10 -120 40 -120 30 0 40 -31 40 -120 0
+-89 10 -120 40 -120 32 0 40 -33 40 -160 0 -127 8 -160 40 -160 32 0 40 -33
+40 -160 0 -127 8 -160 40 -160 33 0 40 -33 40 -200 0 -92 4 -170 10 -181 15
+-27 114 -27 150 1 14 11 32 20 40 20 8 0 26 9 40 20 14 11 32 20 40 20 8 0 26
+9 40 20 14 11 32 20 40 20 8 0 26 9 40 20 14 11 40 20 59 20 24 0 46 11 81 40
+26 22 54 40 61 40 8 0 25 9 39 20 14 11 32 20 40 20 8 0 26 9 40 20 14 11 40
+20 59 20 24 0 46 11 81 40 34 29 57 40 80 40 23 0 46 11 80 40 26 22 54 40 61
+40 8 0 25 9 39 20 14 11 32 20 40 20 8 0 26 9 40 20 14 11 32 20 40 20 8 0 26
+9 40 20 14 11 32 20 40 20 8 0 26 9 40 20 14 11 32 20 40 20 8 0 26 9 40 20
+14 11 32 20 40 20 8 0 26 9 40 20 14 11 40 20 59 20 24 0 46 11 81 40 34 29
+57 40 80 40 23 0 46 11 80 40 26 22 54 40 61 40 8 0 25 9 39 20 14 11 32 20
+40 20 8 0 26 9 40 20 14 11 40 20 59 20 24 0 46 11 81 40 34 29 57 40 80 40
+23 0 46 11 80 40 34 29 57 40 80 40 23 0 46 11 80 40 34 29 57 40 80 40 23 0
+46 11 80 40 34 29 57 40 80 40 23 0 46 11 80 40 34 29 57 40 80 40 23 0 46 11
+80 40 34 29 57 40 80 40 23 0 46 11 80 40 34 29 57 40 80 40 23 0 46 11 80 40
+26 22 54 40 61 40 8 0 25 9 39 20 14 11 31 20 38 20 8 0 26 9 41 19 18 13 48
+21 86 23 43 2 60 7 66 21 5 9 13 25 18 35 5 11 22 18 46 20 28 2 53 15 86 43
+33 28 56 39 79 39 23 0 46 11 79 39 42 35 55 40 106 43 43 2 60 7 66 21 5 9
+13 25 18 35 5 11 22 18 46 20 28 2 53 15 85 42 41 34 54 39 105 42 43 2 60 7
+66 21 5 9 13 25 18 35 6 12 24 18 71 22 47 4 65 10 71 23 5 9 13 25 18 35 6
+12 24 18 71 22 42 3 65 10 70 20 23 51 28 55 65 58 28 2 53 15 86 43 34 29 56
+39 81 39 25 0 42 8 66 33 l32 33 0 2111 c0 2209 1 2143 -36 2143 -28 0 -44
+-25 -44 -68 0 -56 -14 -86 -30 -62 -6 10 -10 459 -10 1258 0 1128 -1 1245 -16
+1267 -16 24 -15 27 20 69 36 44 36 45 36 138 0 77 4 97 20 118 11 14 20 32 20
+40 0 8 9 26 20 40 23 29 32 2739 10 2781 -17 30 -13163 30 -13180 0z m7584
+-3617 c11 -27 7 -1478 -4 -1494 -27 -40 -30 35 -30 747 0 697 2 763 20 763 4
+0 11 -7 14 -16z m-3544 -294 c42 -28 -52 -30 -1450 -30 -1398 0 -1492 2 -1450
+30 10 6 525 10 1450 10 925 0 1440 -4 1450 -10z m8000 0 c42 -28 -52 -30
+-1450 -30 -1398 0 -1492 2 -1450 30 10 6 525 10 1450 10 925 0 1440 -4 1450
+-10z"/>
+<path fill="#960104" d="M770 3821 c-14 -27 -14 -3295 0 -3322 10 -18 25 -19 366 -19 312 0
+358 -2 380 -16 24 -16 26 -16 54 11 l30 29 0 376 0 376 33 32 33 32 397 0
+c382 0 397 -1 407 -19 6 -13 10 -157 10 -401 0 -244 4 -388 10 -401 10 -18 24
+-19 288 -19 260 0 279 -2 302 -20 30 -24 49 -25 78 -5 17 12 26 13 42 5 17 -9
+27 -8 45 4 14 9 31 16 39 16 36 0 36 21 36 1680 0 1112 -3 1648 -10 1661 -17
+30 -803 30 -820 0 -7 -13 -10 -290 -10 -828 l0 -809 -33 -32 -33 -32 -295 0
+c-249 0 -298 2 -317 15 -17 12 -26 13 -42 5 -16 -8 -25 -7 -42 5 -13 8 -39 15
+-60 15 -60 0 -58 -32 -58 840 0 533 -3 808 -10 821 -10 18 -25 19 -410 19
+-385 0 -400 -1 -410 -19z"/>
+<path fill="#960104" d="M3770 3821 c-14 -27 -14 -3295 0 -3322 6 -10 17 -19 26 -19 8 0 26
+-7 39 -16 23 -15 27 -15 50 0 40 26 440 23 475 -4 18 -14 41 -20 80 -20 39 0
+62 6 80 20 14 11 33 20 42 20 35 0 38 32 38 420 0 244 4 388 10 401 10 18 26
+19 428 19 431 0 442 1 442 40 0 8 9 26 20 40 11 14 20 32 20 40 0 8 9 26 20
+40 11 14 20 32 20 40 0 8 9 26 20 40 11 14 20 32 20 40 0 8 9 26 20 40 11 14
+20 32 20 40 0 8 9 26 20 40 11 14 20 32 20 40 0 8 9 26 20 40 11 14 20 32 20
+40 0 8 9 26 20 40 11 14 20 32 20 40 0 8 9 26 20 40 11 14 20 31 20 38 0 8 10
+27 21 44 31 43 14 78 -38 78 -22 0 -48 9 -63 20 -18 14 -41 20 -80 20 -39 0
+-62 -6 -80 -20 -23 -18 -42 -20 -240 -20 -198 0 -217 2 -240 20 -35 27 -125
+27 -160 0 -18 -14 -41 -20 -80 -20 -39 0 -62 6 -80 20 -31 24 -49 25 -79 4
+-21 -15 -24 -15 -52 12 l-29 28 0 389 c0 248 4 395 10 408 10 19 29 19 730 19
+701 0 720 0 730 19 6 13 10 157 10 401 0 244 -4 388 -10 401 -17 30 -2283 30
+-2300 0z"/>
+<path fill="#960104" d="M7760 3820 c-20 -15 -41 -20 -100 -20 -59 0 -80 -5 -100 -20 -14 -11
+-41 -20 -60 -20 -19 0 -46 -9 -60 -20 -14 -11 -41 -20 -60 -20 -19 0 -46 -9
+-60 -20 -14 -11 -32 -20 -40 -20 -8 0 -26 -9 -40 -20 -14 -11 -31 -20 -39 -20
+-7 0 -35 -18 -61 -40 -26 -22 -54 -40 -61 -40 -8 0 -43 -27 -79 -60 -36 -33
+-73 -60 -82 -60 -21 0 -198 -177 -198 -198 0 -9 -27 -46 -60 -82 -33 -36 -60
+-71 -60 -79 0 -7 -18 -35 -40 -61 -22 -26 -40 -54 -40 -61 0 -8 -9 -25 -20
+-39 -11 -14 -20 -32 -20 -40 0 -8 -9 -26 -20 -40 -11 -14 -20 -41 -20 -60 0
+-19 -9 -46 -20 -60 -11 -14 -20 -32 -20 -40 0 -8 -9 -26 -20 -40 -15 -20 -20
+-41 -20 -100 0 -59 -5 -80 -20 -100 -18 -23 -20 -42 -20 -280 0 -238 2 -257
+20 -280 15 -20 20 -41 20 -100 0 -59 5 -80 20 -100 11 -14 20 -41 20 -60 0
+-19 9 -46 20 -60 11 -14 20 -32 20 -40 0 -8 9 -26 20 -40 11 -14 20 -40 20
+-59 0 -24 11 -46 40 -81 22 -26 40 -53 40 -60 0 -7 18 -34 40 -60 22 -26 40
+-55 40 -63 0 -22 376 -397 398 -397 9 0 28 -9 42 -20 14 -11 31 -20 39 -20 7
+0 35 -18 61 -40 26 -22 54 -40 61 -40 8 0 25 -9 39 -20 14 -11 41 -20 60 -20
+19 0 46 -9 60 -20 14 -11 32 -20 40 -20 8 0 26 -9 40 -20 18 -14 41 -20 80
+-20 39 0 62 -6 80 -20 24 -19 43 -20 380 -20 337 0 356 1 380 20 18 14 41 20
+80 20 39 0 62 6 80 20 14 11 32 20 40 20 8 0 26 9 40 20 14 11 32 20 40 20 8
+0 26 9 40 20 14 11 40 20 59 20 24 0 46 11 81 40 26 22 53 40 60 40 7 0 34 18
+60 40 26 22 55 40 63 40 21 0 317 296 317 317 0 8 18 37 40 63 22 26 40 53 40
+60 0 7 18 34 40 60 29 35 40 57 40 81 0 19 9 45 20 59 11 14 20 32 20 40 0 8
+9 26 20 40 11 14 20 32 20 40 0 8 9 26 20 40 14 18 20 41 20 80 0 39 6 62 20
+80 17 21 20 41 20 140 0 99 3 119 20 140 16 21 20 41 20 120 0 79 -4 99 -20
+120 -16 21 -20 41 -20 120 0 79 -4 99 -20 120 -14 18 -20 41 -20 80 0 39 -6
+62 -20 80 -11 14 -20 41 -20 60 0 19 -9 46 -20 60 -11 14 -20 32 -20 40 0 8
+-9 26 -20 40 -11 14 -20 32 -20 40 0 8 -9 26 -20 40 -11 14 -20 31 -20 39 0 7
+-18 35 -40 61 -22 26 -40 55 -40 63 0 21 -376 397 -397 397 -8 0 -37 18 -63
+40 -26 22 -54 40 -61 40 -8 0 -25 9 -39 20 -14 11 -32 20 -40 20 -8 0 -26 9
+-40 20 -14 11 -32 20 -40 20 -8 0 -26 9 -40 20 -14 11 -32 20 -40 20 -8 0 -26
+9 -40 20 -14 11 -41 20 -60 20 -19 0 -46 9 -60 20 -20 15 -41 20 -100 20 -59
+0 -80 5 -100 20 -23 18 -42 20 -260 20 -218 0 -237 -2 -260 -20z m440 -840
+c18 -14 41 -20 80 -20 39 0 62 -6 80 -20 14 -11 31 -20 39 -20 7 0 35 -18 61
+-40 26 -22 55 -40 63 -40 19 0 157 -138 157 -157 0 -8 18 -37 40 -63 22 -26
+40 -54 40 -61 0 -8 9 -25 20 -39 11 -14 20 -32 20 -40 0 -8 9 -26 20 -40 14
+-18 20 -41 20 -80 0 -39 6 -62 20 -80 16 -21 20 -41 20 -120 0 -79 -4 -99 -20
+-120 -14 -18 -20 -41 -20 -80 0 -39 -6 -62 -20 -80 -11 -14 -20 -41 -20 -60 0
+-19 -9 -46 -20 -60 -11 -14 -20 -33 -20 -42 0 -22 -296 -318 -318 -318 -9 0
+-28 -9 -42 -20 -14 -11 -41 -20 -60 -20 -19 0 -46 -9 -60 -20 -18 -14 -41 -20
+-80 -20 -39 0 -62 -6 -80 -20 -21 -16 -41 -20 -120 -20 -79 0 -99 4 -120 20
+-18 14 -41 20 -80 20 -39 0 -62 6 -80 20 -14 11 -32 20 -40 20 -8 0 -26 9 -40
+20 -14 11 -32 20 -40 20 -8 0 -26 9 -40 20 -14 11 -33 20 -42 20 -21 0 -198
+176 -198 197 0 8 -18 37 -40 63 -22 26 -40 54 -40 61 0 8 -9 25 -20 39 -11 14
+-20 41 -20 60 0 19 -9 46 -20 60 -18 23 -20 42 -20 220 0 178 2 197 20 220 11
+14 20 41 20 60 0 19 9 46 20 60 11 14 20 32 20 40 0 8 9 26 20 40 11 14 20 33
+20 42 0 22 256 278 278 278 9 0 28 9 42 20 14 11 32 20 40 20 8 0 26 9 40 20
+14 11 41 20 60 20 19 0 46 9 60 20 23 18 42 20 200 20 158 0 177 -2 200 -20z"/>
+<path fill="#960104" d="M9930 3821 c-7 -13 -10 -549 -10 -1661 0 -1112 3 -1648 10 -1661 17
+-30 803 -30 820 0 6 13 10 153 10 388 l0 369 33 32 c31 30 37 32 109 32 l77 0
+421 -420 421 -420 319 0 c381 0 340 -25 340 209 l0 170 -300 301 c-165 166
+-300 306 -300 311 0 22 22 49 40 49 23 0 320 294 320 317 0 8 18 37 40 63 22
+26 40 54 40 61 0 8 9 25 20 39 11 14 20 32 20 40 0 8 9 26 20 40 11 14 20 41
+20 60 0 19 9 46 20 60 14 18 20 41 20 80 0 39 6 62 20 80 18 23 20 42 20 220
+0 178 -2 197 -20 220 -14 18 -20 41 -20 80 0 39 -6 62 -20 80 -11 14 -20 32
+-20 40 0 8 -9 26 -20 40 -11 14 -20 40 -20 59 0 24 -11 46 -40 81 -22 26 -40
+53 -40 60 0 7 -18 34 -40 60 -22 26 -40 55 -40 63 0 20 -177 197 -197 197 -8
+0 -37 18 -63 40 -26 22 -53 40 -60 40 -7 0 -34 18 -60 40 -35 29 -57 40 -81
+40 -19 0 -45 9 -59 20 -14 11 -32 20 -40 20 -8 0 -26 9 -40 20 -18 14 -41 20
+-80 20 -39 0 -62 6 -80 20 -39 30 -1493 31 -1510 1z m1430 -841 c14 -11 33
+-20 42 -20 21 0 198 -177 198 -198 0 -9 9 -28 20 -42 17 -22 20 -41 20 -140 0
+-99 -3 -118 -20 -140 -11 -14 -20 -31 -20 -39 0 -7 -18 -35 -40 -61 -22 -26
+-40 -54 -40 -62 0 -18 -20 -38 -38 -38 -8 0 -36 -18 -62 -40 -43 -36 -54 -40
+-101 -40 -38 0 -61 -6 -79 -20 -23 -18 -42 -20 -220 -20 l-194 0 -33 32 -33
+32 0 389 c0 248 4 395 10 408 16 30 551 29 590 -1z"/>
+<path fill="#960104" d="M12730 3821 c-6 -13 -10 -157 -10 -401 0 -244 4 -388 10 -401 10 -18
+25 -19 410 -19 385 0 400 -1 410 -19 7 -13 10 -418 10 -1241 0 -823 3 -1228
+10 -1241 17 -30 803 -30 820 0 7 13 10 418 10 1241 0 823 3 1228 10 1241 10
+18 25 19 410 19 385 0 400 1 410 19 6 13 10 157 10 401 0 244 -4 388 -10 401
+-17 30 -2483 30 -2500 0z"/>
+<path fill="#fff" d="M7640 15300 c-14 -11 -41 -20 -60 -20 -19 0 -46 -9 -60 -20 -14 -11
+-33 -20 -42 -20 -22 0 -238 -216 -238 -238 0 -9 -9 -28 -20 -42 -11 -14 -20
+-32 -20 -40 0 -8 -9 -26 -20 -40 -19 -24 -20 -48 -20 -1041 l0 -1017 -71 -71
+-71 -71 -77 0 c-116 0 -141 28 -141 160 0 79 -4 99 -20 120 -14 18 -20 41 -20
+80 0 39 -6 62 -20 80 -11 14 -20 32 -20 40 0 8 -9 26 -20 40 -11 14 -20 32
+-20 40 0 8 -9 26 -20 40 -11 14 -20 32 -20 40 0 8 -9 26 -20 40 -11 14 -20 32
+-20 40 0 9 -36 54 -80 100 -44 46 -80 92 -80 101 0 19 -17 35 -44 40 -10 2
+-23 12 -27 22 -5 9 -13 25 -18 35 -4 9 -17 19 -27 21 -10 2 -40 21 -65 42 -26
+22 -52 39 -59 39 -7 0 -34 18 -60 40 -35 29 -57 40 -81 40 -19 0 -45 9 -59 20
+-14 11 -32 20 -40 20 -8 0 -26 9 -40 20 -20 15 -41 20 -100 20 -59 0 -80 5
+-100 20 -25 19 -52 20 -1520 20 -1468 0 -1495 1 -1520 20 -21 16 -41 20 -120
+20 -79 0 -99 4 -120 20 -14 11 -32 20 -40 20 -8 0 -26 9 -40 20 -14 11 -32 20
+-40 20 -8 0 -26 9 -40 20 -14 11 -32 20 -40 20 -8 0 -26 9 -40 20 -14 11 -31
+20 -39 20 -7 0 -35 18 -61 40 -26 22 -55 40 -63 40 -20 0 -237 217 -237 237 0
+8 -18 37 -40 63 -22 26 -40 54 -40 62 0 22 -47 61 -64 55 -14 -6 -16 -138 -16
+-1278 l0 -1271 40 -48 c22 -26 40 -53 40 -60 0 -7 18 -34 40 -60 22 -26 40
+-55 40 -63 0 -21 256 -277 277 -277 8 0 37 -18 63 -40 26 -22 54 -40 61 -40 8
+0 25 -9 39 -20 14 -11 32 -20 40 -20 8 0 26 -9 40 -20 14 -11 41 -20 60 -20
+19 0 46 -9 60 -20 14 -11 41 -20 60 -20 19 0 46 -9 60 -20 24 -19 44 -20 500
+-20 456 0 476 -1 500 -20 23 -18 42 -20 240 -20 198 0 217 -2 240 -20 21 -16
+41 -20 120 -20 79 0 99 -4 120 -20 20 -15 41 -20 100 -20 59 0 80 -5 100 -20
+20 -15 41 -20 100 -20 59 0 80 -5 100 -20 18 -14 41 -20 80 -20 39 0 62 -6 80
+-20 18 -14 41 -20 80 -20 39 0 62 -6 80 -20 14 -11 41 -20 60 -20 19 0 46 -9
+60 -20 14 -11 41 -20 60 -20 19 0 46 -9 60 -20 14 -11 41 -20 60 -20 19 0 46
+-9 60 -20 14 -11 41 -20 60 -20 19 0 46 -9 60 -20 14 -11 41 -20 60 -20 19 0
+46 -9 60 -20 14 -11 32 -20 40 -20 8 0 26 -9 40 -20 14 -11 41 -20 60 -20 19
+0 46 -9 60 -20 14 -11 32 -20 40 -20 8 0 26 -9 40 -20 14 -11 32 -20 40 -20 8
+0 26 -9 40 -20 14 -11 32 -20 40 -20 8 0 26 -9 40 -20 14 -11 32 -20 40 -20 8
+0 26 -9 40 -20 14 -11 32 -20 40 -20 8 0 26 -9 40 -20 14 -11 32 -20 40 -20 8
+0 26 -9 40 -20 14 -11 32 -20 40 -20 8 0 26 -9 40 -20 14 -11 32 -20 40 -20 8
+0 26 -9 40 -20 14 -11 31 -20 39 -20 7 0 35 -18 61 -40 26 -22 54 -40 61 -40
+8 0 25 -9 39 -20 14 -11 32 -20 40 -20 8 0 44 -27 80 -60 36 -33 71 -60 79
+-60 7 0 35 -18 61 -40 26 -22 53 -40 60 -40 7 0 34 -18 60 -40 26 -22 53 -40
+60 -40 7 0 34 -18 60 -40 26 -22 54 -40 62 -40 8 0 61 -45 118 -100 57 -55
+112 -100 121 -100 10 0 153 -135 319 -300 l301 -300 79 0 78 0 71 71 c39 39
+71 79 71 88 0 22 19 41 41 41 9 0 117 99 239 220 122 121 229 220 239 220 9 0
+55 36 101 80 46 44 91 80 98 80 8 0 36 18 62 40 26 22 54 40 61 40 8 0 43 27
+79 60 36 33 71 60 79 60 7 0 35 18 61 40 26 22 53 40 60 40 7 0 34 18 60 40
+26 22 54 40 61 40 8 0 25 9 39 20 14 11 31 20 39 20 7 0 35 18 61 40 26 22 54
+40 61 40 8 0 25 9 39 20 14 11 32 20 40 20 8 0 26 9 40 20 14 11 32 20 40 20
+8 0 26 9 40 20 14 11 32 20 40 20 8 0 26 9 40 20 14 11 32 20 40 20 8 0 26 9
+40 20 14 11 32 20 40 20 8 0 26 9 40 20 14 11 32 20 40 20 8 0 26 9 40 20 14
+11 32 20 40 20 8 0 26 9 40 20 14 11 32 20 40 20 8 0 26 9 40 20 14 11 41 20
+60 20 19 0 46 9 60 20 14 11 32 20 40 20 8 0 26 9 40 20 14 11 41 20 60 20 19
+0 46 9 60 20 14 11 41 20 60 20 19 0 46 9 60 20 14 11 32 20 40 20 8 0 26 9
+40 20 18 14 41 20 80 20 39 0 62 6 80 20 14 11 41 20 60 20 19 0 46 9 60 20
+18 14 41 20 80 20 39 0 62 6 80 20 18 14 41 20 80 20 39 0 62 6 80 20 20 15
+41 20 100 20 59 0 80 5 100 20 18 14 41 20 80 20 39 0 62 6 80 20 22 17 42 20
+160 20 118 0 138 3 160 20 23 18 42 20 220 20 178 0 197 2 220 20 24 19 44 20
+500 20 456 0 476 1 500 20 14 11 41 20 60 20 19 0 46 9 60 20 14 11 41 20 60
+20 19 0 46 9 60 20 14 11 32 20 40 20 8 0 26 9 40 20 14 11 31 20 39 20 7 0
+35 18 61 40 26 22 55 40 63 40 21 0 277 256 277 277 0 8 18 37 40 63 22 26 40
+54 40 61 0 8 9 25 20 39 11 14 20 32 20 40 0 8 9 26 20 40 21 27 32 2536 11
+2569 -10 15 -31 7 -31 -12 0 -7 -9 -23 -20 -37 -11 -14 -20 -32 -20 -40 0 -8
+-27 -44 -60 -80 -33 -36 -60 -73 -60 -82 0 -21 -176 -198 -197 -198 -8 0 -37
+-18 -63 -40 -26 -22 -53 -40 -60 -40 -7 0 -34 -18 -60 -40 -35 -29 -57 -40
+-81 -40 -19 0 -45 -9 -59 -20 -14 -11 -32 -20 -40 -20 -8 0 -26 -9 -40 -20
+-20 -15 -41 -20 -100 -20 -59 0 -80 -5 -100 -20 -25 -19 -52 -20 -1560 -20
+-1508 0 -1535 -1 -1560 -20 -14 -11 -41 -20 -60 -20 -19 0 -46 -9 -60 -20 -14
+-11 -41 -20 -60 -20 -19 0 -46 -9 -60 -20 -14 -11 -32 -20 -40 -20 -8 0 -26
+-9 -40 -20 -14 -11 -32 -20 -40 -20 -8 0 -26 -9 -40 -20 -14 -11 -32 -20 -40
+-20 -8 0 -44 -27 -80 -60 -36 -33 -72 -60 -81 -60 -22 0 -159 -137 -159 -159
+0 -9 -27 -45 -60 -81 -33 -36 -60 -72 -60 -80 0 -8 -9 -26 -20 -40 -11 -14
+-20 -32 -20 -40 0 -8 -9 -26 -20 -40 -11 -14 -20 -41 -20 -60 0 -19 -9 -46
+-20 -60 -11 -14 -20 -41 -20 -60 0 -19 -9 -46 -20 -60 -17 -21 -20 -41 -20
+-141 l0 -115 -33 -32 c-71 -69 -286 -33 -287 48 0 8 -9 26 -20 40 -23 29 -32
+1499 -10 1541 10 18 26 19 446 19 l435 0 39 -31 c69 -55 70 -51 70 213 0 216
+-2 235 -20 258 -11 14 -20 41 -20 60 0 19 -9 46 -20 60 -11 14 -20 32 -20 40
+0 8 -9 26 -20 40 -11 14 -20 32 -20 41 0 22 -137 159 -159 159 -9 0 -27 9 -41
+20 -14 11 -32 20 -40 20 -8 0 -26 9 -40 20 -14 11 -32 20 -40 20 -8 0 -26 9
+-40 20 -24 19 -48 20 -1000 20 -952 0 -976 -1 -1000 -20z"/>
+<path fill="#fff" d="M770 3821 c-14 -27 -14 -3295 0 -3322 10 -18 25 -19 366 -19 312 0
+358 -2 380 -16 24 -16 26 -16 54 11 l30 29 0 376 0 376 33 32 33 32 397 0
+c382 0 397 -1 407 -19 6 -13 10 -157 10 -401 0 -244 4 -388 10 -401 10 -18 24
+-19 288 -19 260 0 279 -2 302 -20 30 -24 49 -25 78 -5 17 12 26 13 42 5 17 -9
+27 -8 45 4 14 9 31 16 39 16 36 0 36 21 36 1680 0 1112 -3 1648 -10 1661 -17
+30 -803 30 -820 0 -7 -13 -10 -290 -10 -828 l0 -809 -33 -32 -33 -32 -295 0
+c-249 0 -298 2 -317 15 -17 12 -26 13 -42 5 -16 -8 -25 -7 -42 5 -13 8 -39 15
+-60 15 -60 0 -58 -32 -58 840 0 533 -3 808 -10 821 -10 18 -25 19 -410 19
+-385 0 -400 -1 -410 -19z"/>
+<path fill="#fff" d="M3770 3821 c-14 -27 -14 -3295 0 -3322 6 -10 17 -19 26 -19 8 0 26
+-7 39 -16 23 -15 27 -15 50 0 40 26 440 23 475 -4 18 -14 41 -20 80 -20 39 0
+62 6 80 20 14 11 33 20 42 20 35 0 38 32 38 420 0 244 4 388 10 401 10 18 26
+19 428 19 431 0 442 1 442 40 0 8 9 26 20 40 11 14 20 32 20 40 0 8 9 26 20
+40 11 14 20 32 20 40 0 8 9 26 20 40 11 14 20 32 20 40 0 8 9 26 20 40 11 14
+20 32 20 40 0 8 9 26 20 40 11 14 20 32 20 40 0 8 9 26 20 40 11 14 20 32 20
+40 0 8 9 26 20 40 11 14 20 32 20 40 0 8 9 26 20 40 11 14 20 31 20 38 0 8 10
+27 21 44 31 43 14 78 -38 78 -22 0 -48 9 -63 20 -18 14 -41 20 -80 20 -39 0
+-62 -6 -80 -20 -23 -18 -42 -20 -240 -20 -198 0 -217 2 -240 20 -35 27 -125
+27 -160 0 -18 -14 -41 -20 -80 -20 -39 0 -62 6 -80 20 -31 24 -49 25 -79 4
+-21 -15 -24 -15 -52 12 l-29 28 0 389 c0 248 4 395 10 408 10 19 29 19 730 19
+701 0 720 0 730 19 6 13 10 157 10 401 0 244 -4 388 -10 401 -17 30 -2283 30
+-2300 0z"/>
+<path fill="#fff" d="M7760 3820 c-20 -15 -41 -20 -100 -20 -59 0 -80 -5 -100 -20 -14 -11
+-41 -20 -60 -20 -19 0 -46 -9 -60 -20 -14 -11 -41 -20 -60 -20 -19 0 -46 -9
+-60 -20 -14 -11 -32 -20 -40 -20 -8 0 -26 -9 -40 -20 -14 -11 -31 -20 -39 -20
+-7 0 -35 -18 -61 -40 -26 -22 -54 -40 -61 -40 -8 0 -43 -27 -79 -60 -36 -33
+-73 -60 -82 -60 -21 0 -198 -177 -198 -198 0 -9 -27 -46 -60 -82 -33 -36 -60
+-71 -60 -79 0 -7 -18 -35 -40 -61 -22 -26 -40 -54 -40 -61 0 -8 -9 -25 -20
+-39 -11 -14 -20 -32 -20 -40 0 -8 -9 -26 -20 -40 -11 -14 -20 -41 -20 -60 0
+-19 -9 -46 -20 -60 -11 -14 -20 -32 -20 -40 0 -8 -9 -26 -20 -40 -15 -20 -20
+-41 -20 -100 0 -59 -5 -80 -20 -100 -18 -23 -20 -42 -20 -280 0 -238 2 -257
+20 -280 15 -20 20 -41 20 -100 0 -59 5 -80 20 -100 11 -14 20 -41 20 -60 0
+-19 9 -46 20 -60 11 -14 20 -32 20 -40 0 -8 9 -26 20 -40 11 -14 20 -40 20
+-59 0 -24 11 -46 40 -81 22 -26 40 -53 40 -60 0 -7 18 -34 40 -60 22 -26 40
+-55 40 -63 0 -22 376 -397 398 -397 9 0 28 -9 42 -20 14 -11 31 -20 39 -20 7
+0 35 -18 61 -40 26 -22 54 -40 61 -40 8 0 25 -9 39 -20 14 -11 41 -20 60 -20
+19 0 46 -9 60 -20 14 -11 32 -20 40 -20 8 0 26 -9 40 -20 18 -14 41 -20 80
+-20 39 0 62 -6 80 -20 24 -19 43 -20 380 -20 337 0 356 1 380 20 18 14 41 20
+80 20 39 0 62 6 80 20 14 11 32 20 40 20 8 0 26 9 40 20 14 11 32 20 40 20 8
+0 26 9 40 20 14 11 40 20 59 20 24 0 46 11 81 40 26 22 53 40 60 40 7 0 34 18
+60 40 26 22 55 40 63 40 21 0 317 296 317 317 0 8 18 37 40 63 22 26 40 53 40
+60 0 7 18 34 40 60 29 35 40 57 40 81 0 19 9 45 20 59 11 14 20 32 20 40 0 8
+9 26 20 40 11 14 20 32 20 40 0 8 9 26 20 40 14 18 20 41 20 80 0 39 6 62 20
+80 17 21 20 41 20 140 0 99 3 119 20 140 16 21 20 41 20 120 0 79 -4 99 -20
+120 -16 21 -20 41 -20 120 0 79 -4 99 -20 120 -14 18 -20 41 -20 80 0 39 -6
+62 -20 80 -11 14 -20 41 -20 60 0 19 -9 46 -20 60 -11 14 -20 32 -20 40 0 8
+-9 26 -20 40 -11 14 -20 32 -20 40 0 8 -9 26 -20 40 -11 14 -20 31 -20 39 0 7
+-18 35 -40 61 -22 26 -40 55 -40 63 0 21 -376 397 -397 397 -8 0 -37 18 -63
+40 -26 22 -54 40 -61 40 -8 0 -25 9 -39 20 -14 11 -32 20 -40 20 -8 0 -26 9
+-40 20 -14 11 -32 20 -40 20 -8 0 -26 9 -40 20 -14 11 -32 20 -40 20 -8 0 -26
+9 -40 20 -14 11 -41 20 -60 20 -19 0 -46 9 -60 20 -20 15 -41 20 -100 20 -59
+0 -80 5 -100 20 -23 18 -42 20 -260 20 -218 0 -237 -2 -260 -20z m440 -840
+c18 -14 41 -20 80 -20 39 0 62 -6 80 -20 14 -11 31 -20 39 -20 7 0 35 -18 61
+-40 26 -22 55 -40 63 -40 19 0 157 -138 157 -157 0 -8 18 -37 40 -63 22 -26
+40 -54 40 -61 0 -8 9 -25 20 -39 11 -14 20 -32 20 -40 0 -8 9 -26 20 -40 14
+-18 20 -41 20 -80 0 -39 6 -62 20 -80 16 -21 20 -41 20 -120 0 -79 -4 -99 -20
+-120 -14 -18 -20 -41 -20 -80 0 -39 -6 -62 -20 -80 -11 -14 -20 -41 -20 -60 0
+-19 -9 -46 -20 -60 -11 -14 -20 -33 -20 -42 0 -22 -296 -318 -318 -318 -9 0
+-28 -9 -42 -20 -14 -11 -41 -20 -60 -20 -19 0 -46 -9 -60 -20 -18 -14 -41 -20
+-80 -20 -39 0 -62 -6 -80 -20 -21 -16 -41 -20 -120 -20 -79 0 -99 4 -120 20
+-18 14 -41 20 -80 20 -39 0 -62 6 -80 20 -14 11 -32 20 -40 20 -8 0 -26 9 -40
+20 -14 11 -32 20 -40 20 -8 0 -26 9 -40 20 -14 11 -33 20 -42 20 -21 0 -198
+176 -198 197 0 8 -18 37 -40 63 -22 26 -40 54 -40 61 0 8 -9 25 -20 39 -11 14
+-20 41 -20 60 0 19 -9 46 -20 60 -18 23 -20 42 -20 220 0 178 2 197 20 220 11
+14 20 41 20 60 0 19 9 46 20 60 11 14 20 32 20 40 0 8 9 26 20 40 11 14 20 33
+20 42 0 22 256 278 278 278 9 0 28 9 42 20 14 11 32 20 40 20 8 0 26 9 40 20
+14 11 41 20 60 20 19 0 46 9 60 20 23 18 42 20 200 20 158 0 177 -2 200 -20z"/>
+<path fill="#fff" d="M9930 3821 c-7 -13 -10 -549 -10 -1661 0 -1112 3 -1648 10 -1661 17
+-30 803 -30 820 0 6 13 10 153 10 388 l0 369 33 32 c31 30 37 32 109 32 l77 0
+421 -420 421 -420 319 0 c381 0 340 -25 340 209 l0 170 -300 301 c-165 166
+-300 306 -300 311 0 22 22 49 40 49 23 0 320 294 320 317 0 8 18 37 40 63 22
+26 40 54 40 61 0 8 9 25 20 39 11 14 20 32 20 40 0 8 9 26 20 40 11 14 20 41
+20 60 0 19 9 46 20 60 14 18 20 41 20 80 0 39 6 62 20 80 18 23 20 42 20 220
+0 178 -2 197 -20 220 -14 18 -20 41 -20 80 0 39 -6 62 -20 80 -11 14 -20 32
+-20 40 0 8 -9 26 -20 40 -11 14 -20 40 -20 59 0 24 -11 46 -40 81 -22 26 -40
+53 -40 60 0 7 -18 34 -40 60 -22 26 -40 55 -40 63 0 20 -177 197 -197 197 -8
+0 -37 18 -63 40 -26 22 -53 40 -60 40 -7 0 -34 18 -60 40 -35 29 -57 40 -81
+40 -19 0 -45 9 -59 20 -14 11 -32 20 -40 20 -8 0 -26 9 -40 20 -18 14 -41 20
+-80 20 -39 0 -62 6 -80 20 -39 30 -1493 31 -1510 1z m1430 -841 c14 -11 33
+-20 42 -20 21 0 198 -177 198 -198 0 -9 9 -28 20 -42 17 -22 20 -41 20 -140 0
+-99 -3 -118 -20 -140 -11 -14 -20 -31 -20 -39 0 -7 -18 -35 -40 -61 -22 -26
+-40 -54 -40 -62 0 -18 -20 -38 -38 -38 -8 0 -36 -18 -62 -40 -43 -36 -54 -40
+-101 -40 -38 0 -61 -6 -79 -20 -23 -18 -42 -20 -220 -20 l-194 0 -33 32 -33
+32 0 389 c0 248 4 395 10 408 16 30 551 29 590 -1z"/>
+<path fill="#fff" d="M12730 3821 c-6 -13 -10 -157 -10 -401 0 -244 4 -388 10 -401 10 -18
+25 -19 410 -19 385 0 400 -1 410 -19 7 -13 10 -418 10 -1241 0 -823 3 -1228
+10 -1241 17 -30 803 -30 820 0 7 13 10 418 10 1241 0 823 3 1228 10 1241 10
+18 25 19 410 19 385 0 400 1 410 19 6 13 10 157 10 401 0 244 -4 388 -10 401
+-17 30 -2483 30 -2500 0z"/>
+</g>
+<g fill="none" stroke="#fff" stroke-width="6"><circle cx="1493" cy="1585" r="29"/></g>
+<text x="1493" y="1585" fill="#fff" font-family="Arial,Helvetica,sans-serif" font-weight="700" font-size="38" text-anchor="middle" dominant-baseline="central">R</text>
+</svg>
+      <div class="titulos">
+        <h1>Painel dos postos</h1>
+        <p class="sub">Visão geral das fitas de status da fábrica, atualizada a cada poucos segundos.</p>
+      </div>
+    </div>
+    <div class="acoes-cabecalho">
+      <button class="link-editar" id="botao-qr-painel" type="button" hidden>QR deste painel</button>
+      <button class="link-editar" id="botao-editar" type="button">editar postos</button>
+    </div>
+  </div>
+
+  <section class="editor" id="editor" hidden>
+    <p class="sub">Cada linha é um posto: a coisa no servidor (deixe em branco se ainda não existe) e um rótulo para mostrar aqui. O nome da coisa nunca é salvo neste site — ele só vive no link que você guardar.</p>
+    <div id="linhas"></div>
+    <p class="erro-campo" id="erro-editor" hidden></p>
+    <div class="acoes">
+      <button class="secundario" id="mais-linha" type="button">+ acrescentar posto</button>
+      <button class="principal" id="gerar-link" type="button">Gerar / atualizar painel</button>
+    </div>
+  </section>
+
+  <div class="link-pronto" id="link-pronto" hidden></div>
+
+  <section class="grade" id="grade" hidden></section>
+
+  <div class="modal-qr" id="modal-qr" hidden>
+    <div class="modal-conteudo">
+      <div class="qr-grande" id="qr-grande"></div>
+      <div class="modal-rotulo" id="modal-rotulo"></div>
+      <p class="modal-aviso" id="modal-aviso" hidden></p>
+      <div class="modal-botoes">
+        <button id="modal-baixar" type="button">Baixar PNG</button>
+        <button id="modal-fechar" type="button">Fechar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="rodape" id="rodape" hidden>
+    <span class="ponto" id="ponto"></span>
+    <span id="conexao">consultando servidor…</span>
+  </div>
+</main>
+
+<script src="qrcodegen.js"></script>
+<script>
+(() => {
+  const INTERVALO_MS = 5000;
+  const ONLINE_S = 75;
+  const CORES = {
+    0: { nome: 'Apagada',  css: 'var(--apagada)' },
+    1: { nome: 'Verde',    css: 'var(--verde)' },
+    2: { nome: 'Amarelo',  css: 'var(--amarelo)' },
+    3: { nome: 'Vermelho', css: 'var(--vermelho)' },
+  };
+  const API = 'https://dweet.settima.com.br';
+  const COISA_VALIDA = /^[A-Za-z0-9_.\-]{6,120}$/;
+
+  const $ = (id) => document.getElementById(id);
+  let postos = [];       // [{coisa, rotulo}]
+  let estado = {};       // coisa -> {exibindo, idadeS, ok}
+  let timer = null;
+  let ultimaLeituraOk = 0;
+  const qrCache = {}; // "coisa|rotulo" -> svg do QR (o link não muda, então só precisa gerar uma vez)
+
+  function urlTeclado(coisa, rotulo) {
+    // Resolvido pela própria URL do painel: funciona igual em status.settima.com.br,
+    // em m33600.github.io/fita-status e em qualquer cópia/teste local.
+    const base = new URL('index.html', location.href).href;
+    // ":" nunca aparece numa coisa válida, então dá pra separar o rótulo sem
+    // ambiguidade; o teclado usa o rótulo só como título da página.
+    return rotulo ? `${base}#${coisa}:${encodeURIComponent(rotulo)}` : `${base}#${coisa}`;
+  }
+
+  function qrSvg(texto) {
+    const qr = qrcodegen.QrCode.encodeText(texto, qrcodegen.QrCode.Ecc.MEDIUM);
+    const margem = 2;
+    const total = qr.size + margem * 2;
+    let modulos = '';
+    for (let y = 0; y < qr.size; y++) {
+      for (let x = 0; x < qr.size; x++) {
+        if (qr.getModule(x, y)) modulos += `<rect x="${x + margem}" y="${y + margem}" width="1" height="1"/>`;
+      }
+    }
+    // Sempre preto sobre branco, mesmo no tema escuro: é o que garante leitura pela câmera.
+    return `<svg viewBox="0 0 ${total} ${total}" shape-rendering="crispEdges" xmlns="http://www.w3.org/2000/svg">` +
+      `<rect width="${total}" height="${total}" fill="#fff"/><g fill="#000">${modulos}</g></svg>`;
+  }
+
+  function qrPara(coisa, rotulo) {
+    const chave = coisa + '|' + rotulo;
+    if (!qrCache[chave]) qrCache[chave] = qrSvg(urlTeclado(coisa, rotulo));
+    return qrCache[chave];
+  }
+
+  // O modal serve tanto ao QR de um posto quanto ao do painel inteiro; guarda o
+  // SVG mostrado para o "Baixar PNG" não precisar gerar de novo.
+  let qrNoModal = { svg: '', arquivo: 'qr.png' };
+
+  function abrirModalComQr(svg, titulo, arquivo, aviso) {
+    qrNoModal = { svg, arquivo };
+    $('qr-grande').innerHTML = svg;
+    $('modal-rotulo').textContent = titulo;
+    const campoAviso = $('modal-aviso');
+    campoAviso.textContent = aviso || '';
+    campoAviso.hidden = !aviso;
+    $('modal-qr').hidden = false;
+  }
+
+  function abrirModalQr(coisa, rotulo) {
+    abrirModalComQr(qrPara(coisa, rotulo), `${rotulo} · aponte a câmera do celular`,
+      `qr-${nomeArquivo(rotulo)}.png`);
+  }
+
+  // O QR do painel é a URL desta página, hash e tudo: quem lê abre um painel
+  // igual a este, com os mesmos postos. É assim que se multiplica um painel —
+  // e é também por isso que ele carrega os nomes das coisas, como o link.
+  function abrirModalQrPainel() {
+    abrirModalComQr(qrSvg(location.href), 'Painel dos postos · aponte a câmera do celular',
+      'qr-painel-dos-postos.png',
+      'Este QR contém o link completo, com os nomes das coisas. Quem lê consegue trocar o status de qualquer posto — trate como trataria o link.');
+  }
+
+  function nomeArquivo(texto) {
+    return (texto || 'posto').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '') || 'posto';
+  }
+
+  // Imprimir e colar na bancada pede um arquivo, não uma tela. O SVG vira PNG
+  // no próprio navegador (canvas), sem serviço nenhum no meio — o mesmo motivo
+  // de a biblioteca de QR estar vendorizada aqui.
+  function baixarQrPng(lado = 720) {
+    const urlSvg = URL.createObjectURL(new Blob([qrNoModal.svg], { type: 'image/svg+xml' }));
+    const img = new Image();
+    img.onload = () => {
+      const tela = document.createElement('canvas');
+      tela.width = tela.height = lado;
+      const ctx = tela.getContext('2d');
+      ctx.imageSmoothingEnabled = false;      // módulo de QR é quadrado; suavizar só borra
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, lado, lado);
+      ctx.drawImage(img, 0, 0, lado, lado);
+      URL.revokeObjectURL(urlSvg);
+      tela.toBlob((png) => {
+        const a = document.createElement('a');
+        a.href = URL.createObjectURL(png);
+        a.download = qrNoModal.arquivo;
+        a.click();
+        setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+      }, 'image/png');
+    };
+    img.onerror = () => { URL.revokeObjectURL(urlSvg); };
+    img.src = urlSvg;
+  }
+
+  function decodeSeguro(s) { try { return decodeURIComponent(s); } catch { return s; } }
+
+  function hashAtual() {
+    // Corta e decodifica CADA campo separadamente, nunca o hash inteiro de uma vez —
+    // um rótulo com "=" ou "|" vira %3D/%7C ao codificar, e decodificar tudo antes de
+    // cortar desfaria isso e embaralharia a lista.
+    const bruto = location.hash.slice(1);
+    if (!bruto.trim()) return [];
+    return bruto.split('|').map((par, i) => {
+      const pos = par.indexOf('=');
+      const coisa = decodeSeguro(pos === -1 ? '' : par.slice(0, pos)).trim();
+      const rotulo = decodeSeguro(pos === -1 ? par : par.slice(pos + 1)).trim() || `Posto ${i + 1}`;
+      return { coisa, rotulo };
+    });
+  }
+
+  function codificar(lista) {
+    return lista.map((p) => `${encodeURIComponent(p.coisa)}=${encodeURIComponent(p.rotulo)}`).join('|');
+  }
+
+  const nomeCor = (s) => CORES[s]?.nome ?? (s === -1 ? 'sem status' : `valor ${s}`);
+  const ha = (s) => s < 60 ? `${Math.round(s)} s` : s < 3600 ? `${Math.round(s / 60)} min` : `${Math.round(s / 3600)} h`;
+
+  // Cronômetro: há quanto tempo o posto está NESTE status — diferente da idade da
+  // confirmação da fita (que só diz se ela está online). Vem do dweet do próprio
+  // status (publicado pelo teclado), não do "-fita".
+  //
+  // O servidor manda "created" em horário de Londres (GMT no inverno, BST=+1h no
+  // verão britânico) — mesma esquisitice do dweet.cc original. Sem compensar, a
+  // duração sai errada conforme a época do ano.
+  function offsetLondresMin() {
+    const parts = new Intl.DateTimeFormat('en-GB', { timeZone: 'Europe/London', timeZoneName: 'shortOffset' }).formatToParts(new Date());
+    const tz = parts.find((p) => p.type === 'timeZoneName')?.value || 'GMT+0';
+    const m = tz.match(/GMT([+-]\d+)?/);
+    return m && m[1] ? parseInt(m[1], 10) * 60 : 0;
+  }
+  function dataCriado(bruto) {
+    if (!bruto) return null;
+    const comoUtc = new Date(bruto.replace(' ', 'T') + 'Z');
+    if (Number.isNaN(comoUtc.getTime())) return null;
+    return new Date(comoUtc.getTime() - offsetLondresMin() * 60000);
+  }
+  function formatarDuracao(ms) {
+    const s = Math.floor(ms / 1000);
+    if (s < 60) return `${s}s`;
+    const min = Math.floor(s / 60);
+    if (min < 60) return `${min}min`;
+    const h = Math.floor(min / 60);
+    if (h < 24) { const r = min % 60; return r ? `${h}h${String(r).padStart(2, '0')}` : `${h}h`; }
+    const d = Math.floor(h / 24);
+    const r = h % 24;
+    return r ? `${d}d${r}h` : `${d}d`;
+  }
+
+  const buscar = (url) => fetch(url, { cache: 'no-store', signal: AbortSignal.timeout(8000) });
+
+  async function lerPosto(coisa) {
+    let exibindo = -1, rssi = null, idadeS = 0, semDado = true;
+    try {
+      const r = await buscar(`${API}/get/latest/dweet/for/${encodeURIComponent(coisa + '-fita')}`);
+      const j = await r.json();
+      if (j.this === 'succeeded') {
+        const d = j.with[0];
+        const ex = parseInt(d.content?.exibindo, 10);
+        const rs = parseInt(d.content?.rssi, 10);
+        // O servidor manda "AAAA-MM-DD HH:MM:SS" sem fuso — sem o "Z", o navegador lê como
+        // hora LOCAL (aqui, America/Sao_Paulo, UTC-3) e a idade sai errada por até 3 h.
+        const criadoEm = Date.parse(d.created.replace(' ', 'T') + 'Z');
+        idadeS = Number.isNaN(criadoEm) ? 0 : (Date.now() - criadoEm) / 1000;
+        exibindo = Number.isNaN(ex) ? -1 : ex;
+        rssi = Number.isNaN(rs) ? null : rs;
+        semDado = false;
+      }
+    } catch {
+      return { ok: false };
+    }
+
+    // Melhor esforço: se o dweet do status falhar, o card ainda mostra cor/RSSI, só sem cronômetro.
+    let criadoStatus = null;
+    try {
+      const r2 = await buscar(`${API}/get/latest/dweet/for/${encodeURIComponent(coisa)}`);
+      const j2 = await r2.json();
+      if (j2.this === 'succeeded') criadoStatus = dataCriado(j2.with?.[0]?.created);
+    } catch {}
+
+    return { ok: true, semDado, idadeS, exibindo, rssi, criadoStatus };
+  }
+
+  async function lerTudo() {
+    const comCoisa = postos.filter((p) => p.coisa);
+    if (comCoisa.length === 0) { render(); return; }
+    const resultados = await Promise.all(comCoisa.map((p) => lerPosto(p.coisa)));
+    let algumOk = false;
+    comCoisa.forEach((p, i) => { estado[p.coisa] = resultados[i]; if (resultados[i].ok) algumOk = true; });
+    if (algumOk) ultimaLeituraOk = Date.now();
+    render();
+  }
+
+  function render() {
+    const grade = $('grade');
+    grade.innerHTML = '';
+    postos.forEach((p) => {
+      const card = document.createElement(p.coisa ? 'a' : 'div');
+      card.className = 'posto';
+      if (p.coisa) {
+        card.href = urlTeclado(p.coisa, p.rotulo);
+        card.target = '_blank';
+        card.rel = 'noopener';
+      } else {
+        card.classList.add('vazio');
+      }
+
+      const topo = document.createElement('div');
+      topo.className = 'topo';
+      const lampada = document.createElement('div');
+      lampada.className = 'lampada';
+      const nome = document.createElement('div');
+      nome.className = 'nome';
+      nome.textContent = p.rotulo;
+      topo.append(lampada, nome);
+
+      if (p.coisa) {
+        const qr = document.createElement('div');
+        qr.className = 'qr';
+        qr.title = 'Abrir o teclado deste posto no celular (toque para ampliar)';
+        qr.innerHTML = qrPara(p.coisa, p.rotulo);
+        qr.addEventListener('click', (ev) => {
+          ev.preventDefault();
+          ev.stopPropagation();
+          abrirModalQr(p.coisa, p.rotulo);
+        });
+        topo.append(qr);
+      }
+
+      const detalhe = document.createElement('div');
+      detalhe.className = 'detalhe';
+
+      if (!p.coisa) {
+        detalhe.textContent = 'ainda não configurado';
+      } else {
+        const e = estado[p.coisa];
+        if (!e) {
+          detalhe.textContent = 'lendo…';
+        } else if (!e.ok) {
+          detalhe.textContent = 'falha ao consultar o servidor';
+          detalhe.classList.add('erro');
+        } else if (e.semDado) {
+          detalhe.textContent = 'sem notícia desta fita ainda';
+        } else {
+          const online = e.idadeS < ONLINE_S;
+          const info = CORES[e.exibindo];
+          lampada.style.background = info ? info.css : '';
+          lampada.style.setProperty('--brilho', info && e.exibindo !== 0 ? info.css : 'transparent');
+          lampada.classList.toggle('acesa', !!info && e.exibindo !== 0 && online);
+          lampada.classList.toggle('velha', !online);
+          const sinal = e.rssi !== null ? ` · ${e.rssi} dBm` : '';
+          const ligado = e.exibindo !== 0 && e.exibindo !== -1;
+          const duracao = (ligado && e.criadoStatus) ? formatarDuracao(Date.now() - e.criadoStatus.getTime()) : '';
+          const cron = duracao ? ` · há ${duracao}` : '';
+          if (online) {
+            detalhe.textContent = nomeCor(e.exibindo) + cron + sinal;
+            detalhe.classList.add('ok');
+          } else {
+            detalhe.textContent = `${nomeCor(e.exibindo)}${cron} · sem sinal há ${ha(e.idadeS)}${sinal}`;
+          }
+        }
+      }
+      card.append(topo, detalhe);
+
+      if (p.coisa) {
+        const abrir = document.createElement('span');
+        abrir.className = 'abrir';
+        abrir.textContent = 'abrir teclado ↗';
+        card.append(abrir);
+      }
+      grade.append(card);
+    });
+    grade.hidden = postos.length === 0;
+
+    const rodape = $('rodape');
+    rodape.hidden = postos.length === 0;
+    if (postos.length) {
+      if (!postos.some((p) => p.coisa)) {
+        $('ponto').className = 'ponto';
+        $('conexao').textContent = 'nenhum posto configurado ainda';
+      } else {
+        const semLeitura = Math.round((Date.now() - (ultimaLeituraOk || Date.now())) / 1000);
+        const ok = ultimaLeituraOk && semLeitura < 15;
+        $('ponto').className = 'ponto ' + (ok ? 'ok' : 'falha');
+        $('conexao').textContent = ok ? 'servidor conectado' : (ultimaLeituraOk ? `sem resposta há ${semLeitura} s` : 'consultando servidor…');
+      }
+    }
+  }
+
+  // --- editor ---
+  function linhaEditor(coisa = '', rotulo = '') {
+    const linha = document.createElement('div');
+    linha.className = 'linha';
+    const iCoisa = document.createElement('input');
+    iCoisa.className = 'coisa';
+    iCoisa.placeholder = 'fita-status-… (em branco = ainda não existe)';
+    iCoisa.value = coisa;
+    iCoisa.autocomplete = 'off';
+    iCoisa.spellcheck = false;
+    const iRotulo = document.createElement('input');
+    iRotulo.className = 'rotulo';
+    iRotulo.placeholder = 'Rótulo (ex.: Posto 3)';
+    iRotulo.value = rotulo;
+    const remover = document.createElement('button');
+    remover.className = 'remover';
+    remover.type = 'button';
+    remover.title = 'Remover esta linha';
+    remover.textContent = '✕';
+    remover.addEventListener('click', () => linha.remove());
+    linha.append(iCoisa, iRotulo, remover);
+    return linha;
+  }
+
+  function abrirEditor(lista) {
+    $('botao-qr-painel').hidden = true;
+    clearInterval(timer);
+    $('grade').hidden = true;
+    $('rodape').hidden = true;
+    const linhas = $('linhas');
+    linhas.innerHTML = '';
+    const base = lista.length ? lista : Array.from({ length: 10 }, (_, i) => ({ coisa: '', rotulo: `Posto ${i + 1}` }));
+    const alvo = base.length < 10 ? base.concat(Array.from({ length: 10 - base.length }, (_, i) => ({ coisa: '', rotulo: `Posto ${base.length + i + 1}` }))) : base;
+    alvo.forEach((p) => linhas.append(linhaEditor(p.coisa, p.rotulo)));
+    $('erro-editor').hidden = true;
+    $('link-pronto').hidden = true;
+    $('editor').hidden = false;
+  }
+
+  function gerarLink() {
+    const linhas = [...$('linhas').querySelectorAll('.linha')];
+    const lista = [];
+    const erro = $('erro-editor');
+    erro.hidden = true;
+    for (const linha of linhas) {
+      const coisa = linha.querySelector('.coisa').value.trim();
+      const rotulo = linha.querySelector('.rotulo').value.trim();
+      if (!coisa && !rotulo) continue;
+      if (coisa && !COISA_VALIDA.test(coisa)) {
+        erro.textContent = `Nome de coisa inválido: "${coisa}" (só letras, números, "_", "." e "-", 6 a 120 caracteres).`;
+        erro.hidden = false;
+        return;
+      }
+      lista.push({ coisa, rotulo: rotulo || `Posto ${lista.length + 1}` });
+    }
+    if (lista.length === 0) {
+      erro.textContent = 'Preencha ao menos um posto (rótulo ou nome da coisa).';
+      erro.hidden = false;
+      return;
+    }
+    location.hash = codificar(lista);
+    const pronto = $('link-pronto');
+    pronto.hidden = false;
+    pronto.textContent = location.href;
+    $('editor').hidden = true;
+  }
+
+  // Guarda o último hash só neste navegador (nunca no repositório, nunca em
+  // servidor nenhum) — assim abrir o painel por um link antigo/genérico não
+  // perde os nomes que você já cadastrou aqui.
+  const CHAVE_LOCAL = 'fita-status-painel-hfort';
+
+  function iniciar() {
+    const bruto = location.hash.slice(1);
+    if (!bruto.trim()) {
+      let salvo = '';
+      try { salvo = localStorage.getItem(CHAVE_LOCAL) || ''; } catch {}
+      if (salvo.trim()) {
+        location.hash = salvo;   // dispara hashchange; iniciar() roda de novo já com ele
+        return;
+      }
+    } else {
+      try { localStorage.setItem(CHAVE_LOCAL, bruto); } catch {}
+    }
+
+    postos = hashAtual();
+    estado = {};
+    ultimaLeituraOk = 0;
+    clearInterval(timer);
+    $('botao-qr-painel').hidden = postos.length === 0;   // sem postos, não há painel a multiplicar
+    if (postos.length === 0) {
+      $('grade').hidden = true;
+      $('rodape').hidden = true;
+      abrirEditor([]);
+    } else {
+      $('editor').hidden = true;
+      render();
+      lerTudo();
+      timer = setInterval(() => { if (!document.hidden) lerTudo(); }, INTERVALO_MS);
+    }
+  }
+
+  function fecharModalQr() { $('modal-qr').hidden = true; }
+  $('modal-fechar').addEventListener('click', fecharModalQr);
+  $('modal-qr').addEventListener('click', (ev) => { if (ev.target === $('modal-qr')) fecharModalQr(); });
+  document.addEventListener('keydown', (ev) => { if (ev.key === 'Escape') fecharModalQr(); });
+
+  $('botao-editar').addEventListener('click', () => abrirEditor(postos));
+  $('botao-qr-painel').addEventListener('click', abrirModalQrPainel);
+  $('modal-baixar').addEventListener('click', baixarQrPng);
+  $('mais-linha').addEventListener('click', () => $('linhas').append(linhaEditor()));
+  $('gerar-link').addEventListener('click', gerarLink);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden && postos.length) lerTudo(); });
+  window.addEventListener('hashchange', iniciar);
+  iniciar();
+})();
+</script>
+</body>
+</html>
